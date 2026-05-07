@@ -1,0 +1,21 @@
+{
+  "name": "maintainer-bot",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "flue build --target node --output .",
+    "dev": "flue dev --target node --env .env",
+    "daily": "flue run daily-maintenance --target node --id daily --payload '{}' --env .env --output .",
+    "save:daily": "node scripts/run-daily.mjs",
+    "check:secrets": "node scripts/check-secrets.mjs"
+  },
+  "dependencies": {
+    "@flue/sdk": "latest",
+    "just-bash": "^2.14.2",
+    "valibot": "^1.0.0"
+  },
+  "devDependencies": {
+    "@flue/cli": "latest",
+    "typescript": "^5.9.2"
+  }
+}

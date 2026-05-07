@@ -1,0 +1,8 @@
+{
+  "owner": "adewale",
+  "mode": "discover-public-repos",
+  "excludeForks": true,
+  "excludeArchived": true,
+  "explicitRepos": [],
+  "notes": "MaintainerBot discovers public repositories for this owner by default. Add repo names to explicitRepos later if you want an allowlist."
+}
