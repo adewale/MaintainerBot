@@ -4,6 +4,16 @@ import * as v from 'valibot';
 
 export const triggers = { webhook: true };
 
+type RepoHealth = {
+	hasReadme: boolean;
+	hasLicense: boolean;
+	hasCi: boolean;
+	hasPackageJson: boolean;
+	hasTests: boolean;
+	hasLockfile: boolean;
+	packageManager: string | null;
+};
+
 type RepoSummary = {
 	name: string;
 	fullName: string;
@@ -14,6 +24,7 @@ type RepoSummary = {
 	pushedAt: string | null;
 	language: string | null;
 	defaultBranch: string;
+	health: RepoHealth;
 };
 
 type WorkItem = {
@@ -61,6 +72,9 @@ type MaintenanceReport = {
 	recommendations: Recommendation[];
 	draftPrCandidates: Recommendation[];
 	createdDraftPrs: CreatedDraftPr[];
+	bestPractices: string[];
+	efficiency: string[];
+	codeQuality: string[];
 	sharedLessons: string[];
 	generatedAt: string;
 	r2?: { bucket: string; keys: string[] };
@@ -104,10 +118,20 @@ export default async function ({ init, env, payload }: FlueContext) {
 		new Bash({ fs, cwd: '/workspace', python: true, network: { dangerouslyAllowFullInternetAccess: true } });
 
 	const hasModel = Boolean(env.ANTHROPIC_API_KEY || env.OPENAI_API_KEY || env.OPENROUTER_API_KEY);
+	const useCloudflareAiGateway = Boolean(env.CLOUDFLARE_ACCOUNT_ID && env.CF_AI_GATEWAY_ID && env.ANTHROPIC_API_KEY);
 	const agent = await init({
 		sandbox,
 		cwd: '/workspace',
 		model: hasModel ? env.FLUE_MODEL || 'anthropic/claude-haiku-4-5' : false,
+		providers: useCloudflareAiGateway
+			? {
+					anthropic: {
+						baseUrl: `https://gateway.ai.cloudflare.com/v1/${env.CLOUDFLARE_ACCOUNT_ID}/${env.CF_AI_GATEWAY_ID}/anthropic`,
+						apiKey: env.ANTHROPIC_API_KEY,
+						headers: env.CF_AI_GATEWAY_TOKEN ? { 'cf-aig-authorization': `Bearer ${env.CF_AI_GATEWAY_TOKEN}` } : undefined,
+					},
+				}
+			: undefined,
 	});
 	const session = await agent.session();
 
@@ -172,11 +196,15 @@ Focus on issues, PRs, best practices, lessons learned, efficiency, code quality,
 			recommendations: candidates,
 			draftPrCandidates: candidates,
 			createdDraftPrs: [],
+			bestPractices: deterministic.bestPractices,
+			efficiency: deterministic.efficiency,
+			codeQuality: deterministic.codeQuality,
 			sharedLessons: llmReport.sharedLessons,
 		};
 	}
 
-	report.createdDraftPrs = await maybeCreateDraftPrs(report, repos, env, githubHeaders);
+	report.createdDraftPrs = await maybeCreateDraftPrs(report, repos, env, githubHeaders, reportsBucket);
+	await maybeSendEmail(report, env);
 
 	if (reportsBucket) {
 		const keys = await writeReportToR2(reportsBucket, report);
@@ -189,7 +217,7 @@ async function fetchRepos(owner: string, headers: Record<string, string>): Promi
 	const response = await fetch(`https://api.github.com/users/${owner}/repos?per_page=100&sort=updated`, { headers });
 	const text = await response.text();
 	if (!response.ok) throw new Error(`GitHub repos API failed: ${response.status} ${text}`);
-	return (JSON.parse(text) as Array<Record<string, any>>)
+	const baseRepos = (JSON.parse(text) as Array<Record<string, any>>)
 		.filter((repo) => !repo.fork && !repo.archived)
 		.map((repo) => ({
 			name: repo.name,
@@ -202,6 +230,30 @@ async function fetchRepos(owner: string, headers: Record<string, string>): Promi
 			language: repo.language,
 			defaultBranch: repo.default_branch ?? 'main',
 		}));
+	return await Promise.all(baseRepos.map(async (repo) => ({ ...repo, health: await fetchRepoHealth(repo.fullName, headers) })));
+}
+
+async function fetchRepoHealth(fullName: string, headers: Record<string, string>): Promise<RepoHealth> {
+	const entries = await ghOptional(`https://api.github.com/repos/${fullName}/contents`, headers);
+	const names = Array.isArray(entries) ? new Set(entries.map((entry: any) => String(entry.name).toLowerCase())) : new Set<string>();
+	const workflows = await ghOptional(`https://api.github.com/repos/${fullName}/contents/.github/workflows`, headers);
+	const pkg = await ghOptional(`https://api.github.com/repos/${fullName}/contents/package.json`, headers);
+	let hasTests = false;
+	if (pkg?.content) {
+		try {
+			const parsed = JSON.parse(atob(String(pkg.content).replace(/\n/g, '')));
+			hasTests = Boolean(parsed.scripts?.test || parsed.scripts?.check || parsed.scripts?.['check:types']);
+		} catch {}
+	}
+	return {
+		hasReadme: [...names].some((name) => name.startsWith('readme')),
+		hasLicense: [...names].some((name) => name.startsWith('license')),
+		hasCi: Array.isArray(workflows) && workflows.length > 0,
+		hasPackageJson: names.has('package.json'),
+		hasTests,
+		hasLockfile: names.has('pnpm-lock.yaml') || names.has('package-lock.json') || names.has('yarn.lock') || names.has('bun.lockb'),
+		packageManager: names.has('pnpm-lock.yaml') ? 'pnpm' : names.has('package-lock.json') ? 'npm' : names.has('yarn.lock') ? 'yarn' : names.has('bun.lockb') ? 'bun' : null,
+	};
 }
 
 async function fetchSearchItems(query: string, headers: Record<string, string>): Promise<WorkItem[]> {
@@ -270,29 +322,52 @@ function renderMarkdown(report: MaintenanceReport) {
 	const prMd = report.pullRequests.map((item) => `- [${item.repo}#${item.number}](${item.url}) ${item.title} — ${item.ageDays}d old, ${item.comments} comments, labels: ${item.labels.join(', ') || 'none'}`).join('\n') || '- No open PRs found.';
 	const recs = report.draftPrCandidates.map((pr) => `### ${pr.repo}: ${pr.title}\n\n- Fingerprint: \`${pr.fingerprint}\`\n- Risk: ${pr.risk}\n- Reason: ${pr.reason}\n- Verification: ${pr.verification}\n`).join('\n') || 'No draft PR candidates.';
 	const created = report.createdDraftPrs.map((pr) => `- ${pr.status}: ${pr.repo}${pr.url ? ` — ${pr.url}` : ''}${pr.reason ? ` — ${pr.reason}` : ''}`).join('\n') || '- No draft PRs created.';
+	const bestPractices = report.bestPractices.map((item) => `- ${item}`).join('\n') || '- No best-practice findings.';
+	const efficiency = report.efficiency.map((item) => `- ${item}`).join('\n') || '- No efficiency findings.';
+	const codeQuality = report.codeQuality.map((item) => `- ${item}`).join('\n') || '- No code-quality findings.';
 	const lessons = report.sharedLessons.map((lesson) => `- ${lesson}`).join('\n') || '- No shared lessons.';
-	return `# MaintainerBot Daily Report\n\nGenerated: ${report.generatedAt}\n\n## Summary\n\n${report.summary}\n\n- Owner: ${report.owner}\n- Mode: ${report.mode}\n- Repositories scanned: ${report.repoCount}\n\n## Priority actions\n\n${actions}\n\n## Open issues\n\n${issueMd}\n\n## Open pull requests\n\n${prMd}\n\n## Draft PR candidates\n\n${recs}\n\n## Draft PR creation results\n\n${created}\n\n## Shared lessons\n\n${lessons}\n`;
+	return `# MaintainerBot Daily Report\n\nGenerated: ${report.generatedAt}\n\n## Summary\n\n${report.summary}\n\n- Owner: ${report.owner}\n- Mode: ${report.mode}\n- Repositories scanned: ${report.repoCount}\n\n## Priority actions\n\n${actions}\n\n## Open issues\n\n${issueMd}\n\n## Open pull requests\n\n${prMd}\n\n## Best practices\n\n${bestPractices}\n\n## Efficiency\n\n${efficiency}\n\n## Code quality\n\n${codeQuality}\n\n## Draft PR candidates\n\n${recs}\n\n## Draft PR creation results\n\n${created}\n\n## Shared lessons\n\n${lessons}\n`;
 }
 
 function buildDeterministicReport(repos: RepoSummary[], issues: WorkItem[], pullRequests: WorkItem[], rejected: Set<string>) {
 	const needsDescription = repos.filter((repo) => !repo.description).slice(0, 10);
+	const missingReadme = repos.filter((repo) => !repo.health.hasReadme).slice(0, 10);
+	const missingLicense = repos.filter((repo) => !repo.health.hasLicense).slice(0, 10);
+	const missingCi = repos.filter((repo) => repo.health.hasPackageJson && !repo.health.hasCi).slice(0, 10);
+	const missingTests = repos.filter((repo) => repo.health.hasPackageJson && !repo.health.hasTests).slice(0, 10);
+	const dependencyUnknown = repos.filter((repo) => repo.health.hasPackageJson && !repo.health.hasLockfile).slice(0, 10);
 	const stale = repos.filter((repo) => repo.pushedAt && Date.now() - Date.parse(repo.pushedAt) > 180 * 24 * 60 * 60 * 1000).slice(0, 10);
 	const recommendations = [
 		...needsDescription.map((repo) => recommendation(repo.fullName, 'metadata-description', 'Add or improve project description/documentation', 'Repository metadata appears incomplete from the scan.', 'Confirm README accurately states purpose and update GitHub description or docs.', 'low' as const)),
+		...missingReadme.map((repo) => recommendation(repo.fullName, 'missing-readme', 'Add README documentation', 'Repository does not expose a README at the root.', 'Add README with purpose, setup, run/test commands, and maintenance notes.', 'low' as const)),
+		...missingCi.map((repo) => recommendation(repo.fullName, 'missing-ci', 'Add basic CI checks', 'Package repository appears to lack GitHub Actions workflows.', 'Add a small CI workflow that installs dependencies and runs tests/build where available.', 'medium' as const)),
+		...missingTests.map((repo) => recommendation(repo.fullName, 'missing-test-script', 'Add or document test command', 'Package repository does not advertise a test/check script.', 'Add a test/check script or document why no automated test exists.', 'medium' as const)),
 		...stale.map((repo) => recommendation(repo.fullName, 'stale-repo-review', 'Review stale repository status', 'Repository has not been pushed recently.', 'Confirm whether the repo should be archived, refreshed, or documented as complete.', 'low' as const)),
 	].filter((item) => !rejected.has(item.fingerprint));
 	return {
-		summary: `Scanned ${repos.length} public, non-fork, non-archived repositories. Found ${issues.length} open issues, ${pullRequests.length} open PRs, ${needsDescription.length} repos missing descriptions, and ${stale.length} potentially stale repos.`,
+		summary: `Scanned ${repos.length} public, non-fork, non-archived repositories. Found ${issues.length} open issues, ${pullRequests.length} open PRs, ${needsDescription.length} repos missing descriptions, ${missingReadme.length} missing READMEs, ${missingCi.length} package repos missing CI, and ${missingTests.length} package repos missing test/check scripts.`,
 		priorityActions: [
-			...issues.slice(0, 10).map((issue) => `Triage issue ${issue.repo}#${issue.number}: ${issue.title}`),
-			...pullRequests.slice(0, 10).map((pr) => `Review PR ${pr.repo}#${pr.number}: ${pr.title}`),
-			...needsDescription.slice(0, 5).map((repo) => `Add a concise GitHub description to ${repo.fullName}.`),
+			...issues.slice(0, 10).map((issue) => `${priority(issue)} Triage issue ${issue.repo}#${issue.number}: ${issue.title}`),
+			...pullRequests.slice(0, 10).map((pr) => `${priority(pr)} Review PR ${pr.repo}#${pr.number}: ${pr.title}`),
+			...needsDescription.slice(0, 5).map((repo) => `[P3] Add a concise GitHub description to ${repo.fullName}.`),
 		].slice(0, 20),
 		issues: issues.slice(0, 30),
 		pullRequests: pullRequests.slice(0, 30),
 		recommendations,
 		draftPrCandidates: recommendations.slice(0, 8),
 		createdDraftPrs: [],
+		bestPractices: [
+			...missingReadme.slice(0, 8).map((repo) => `${repo.fullName}: add or improve README.`),
+			...missingLicense.slice(0, 8).map((repo) => `${repo.fullName}: clarify license if the project is meant for reuse.`),
+		],
+		efficiency: [
+			...missingCi.slice(0, 8).map((repo) => `${repo.fullName}: add CI so maintenance checks run automatically.`),
+			...dependencyUnknown.slice(0, 8).map((repo) => `${repo.fullName}: add/commit a lockfile or clarify package-manager choice.`),
+		],
+		codeQuality: [
+			...missingTests.slice(0, 8).map((repo) => `${repo.fullName}: add a test/check script or document manual verification.`),
+			...stale.slice(0, 8).map((repo) => `${repo.fullName}: review stale status and archive/refresh if needed.`),
+		],
 		sharedLessons: [
 			'Repositories with clear descriptions are easier to triage and maintain.',
 			'Daily maintenance should prioritize small, low-risk fixes and avoid repeating rejected suggestions.',
@@ -305,11 +380,18 @@ function recommendation(repo: string, kind: string, title: string, reason: strin
 	return { fingerprint: `${repo}:${kind}:${slug(title)}`, repo, title, reason, verification, risk };
 }
 
+function priority(item: WorkItem) {
+	if (item.stale) return '[P2]';
+	if (item.labels.some((label) => /p0|critical|security/i.test(label)) || /p0|critical|security|credential/i.test(item.title)) return '[P0]';
+	if (item.ageDays > 60) return '[P1]';
+	return '[P3]';
+}
+
 function slug(value: string) {
 	return value.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 80);
 }
 
-async function maybeCreateDraftPrs(report: MaintenanceReport, repos: RepoSummary[], env: Record<string, any>, headers: Record<string, string>): Promise<CreatedDraftPr[]> {
+async function maybeCreateDraftPrs(report: MaintenanceReport, repos: RepoSummary[], env: Record<string, any>, headers: Record<string, string>, bucket?: R2BucketLike): Promise<CreatedDraftPr[]> {
 	if (env.CREATE_DRAFT_PRS !== 'true') return [];
 	if (!env.GITHUB_TOKEN) return [{ repo: '*', status: 'skipped', reason: 'GITHUB_TOKEN is required to create draft PRs.' }];
 	const allowlist = new Set(String(env.DRAFT_PR_REPO_ALLOWLIST || '').split(',').map((x) => x.trim()).filter(Boolean));
@@ -324,7 +406,18 @@ async function maybeCreateDraftPrs(report: MaintenanceReport, repos: RepoSummary
 		if (!repo) continue;
 		results.push(await createDraftPr(repo, candidate, headers));
 	}
+	if (bucket) await appendCreatedPrLedger(bucket, results);
 	return results;
+}
+
+async function appendCreatedPrLedger(bucket: R2BucketLike, results: CreatedDraftPr[]) {
+	const created = results.filter((result) => result.status === 'created');
+	if (!created.length) return;
+	const key = 'data/created-prs.json';
+	const existing = await bucket.get(key);
+	const ledger = existing ? JSON.parse(await existing.text()) : { version: 1, created: [] };
+	ledger.created.push(...created.map((result) => ({ ...result, createdAt: new Date().toISOString() })));
+	await bucket.put(key, `${JSON.stringify(ledger, null, 2)}\n`, { httpMetadata: { contentType: 'application/json' } });
 }
 
 async function createDraftPr(repo: RepoSummary, candidate: Recommendation, headers: Record<string, string>): Promise<CreatedDraftPr> {
@@ -352,8 +445,36 @@ async function createDraftPr(repo: RepoSummary, candidate: Recommendation, heade
 	}
 }
 
+async function maybeSendEmail(report: MaintenanceReport, env: Record<string, any>) {
+	if (env.EMAIL_DRY_RUN === 'true') return;
+	if (!env.SEND_EMAIL || !env.EMAIL_TO || !env.EMAIL_FROM) return;
+	// Use a dynamic import hidden from the Node/esbuild target. The module exists only in Cloudflare Workers.
+	const { EmailMessage } = await new Function('return import("cloudflare:email")')();
+	const subject = `MaintainerBot Daily Report — ${report.generatedAt.slice(0, 10)}`;
+	const message = new EmailMessage(env.EMAIL_FROM, env.EMAIL_TO, rawEmail(env.EMAIL_FROM, env.EMAIL_TO, subject, renderMarkdown(report)));
+	await env.SEND_EMAIL.send(message);
+}
+
+function rawEmail(from: string, to: string, subject: string, text: string) {
+	const headers = [
+		`From: ${from}`,
+		`To: ${to}`,
+		`Subject: ${subject.replace(/[\r\n]/g, ' ')}`,
+		'MIME-Version: 1.0',
+		'Content-Type: text/plain; charset=UTF-8',
+		'Content-Transfer-Encoding: 8bit',
+	];
+	return `${headers.join('\r\n')}\r\n\r\n${text}`;
+}
+
+async function ghOptional(url: string, headers: Record<string, string>): Promise<any | null> {
+	const response = await fetch(url, { headers });
+	if (!response.ok) return null;
+	return await response.json();
+}
+
 async function gh(url: string, headers: Record<string, string>, method = 'GET', body?: unknown): Promise<any> {
-	const response = await fetch(url, { method, headers, body: body ? JSON.stringify(body) : undefined });
+	const response = await fetch(url, { method, headers: { ...headers, 'Content-Type': 'application/json' }, body: body ? JSON.stringify(body) : undefined });
 	const text = await response.text();
 	if (!response.ok) throw new Error(`${response.status} ${response.statusText}: ${text}`);
 	return text ? JSON.parse(text) : null;

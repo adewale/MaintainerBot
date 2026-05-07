@@ -5,12 +5,18 @@
   "compatibility_flags": ["nodejs_compat"],
   "vars": {
     "GITHUB_OWNER": "adewale",
-    "FLUE_MODEL": "anthropic/claude-haiku-4-5"
+    "FLUE_MODEL": "anthropic/claude-haiku-4-5",
+    "EMAIL_DRY_RUN": "true"
   },
   "r2_buckets": [
     {
       "binding": "MAINTAINERBOT_R2",
       "bucket_name": "maintainerbot-data"
+    }
+  ],
+  "send_email": [
+    {
+      "name": "SEND_EMAIL"
     }
   ]
 }

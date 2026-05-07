@@ -225,8 +225,8 @@ The daily report should eventually include:
 
 - Summary
 - Priority actions
-- Issue triage
-- PR triage
+- Issue triage with priority labels
+- PR triage with priority labels
 - Best practices and lessons learned
 - Efficiency opportunities
 - Code quality opportunities
@@ -238,9 +238,12 @@ The daily report should eventually include:
 Current report sections:
 
 - Summary
-- Priority actions
+- Priority actions with P0/P1/P2/P3 priority prefixes
 - Open issues with links, age, labels, comments, and author
 - Open pull requests with links, age, labels, comments, and author
+- Best-practice findings
+- Efficiency findings
+- Code-quality findings
 - Draft PR candidates with stable fingerprints
 - Draft PR creation results
 - Shared lessons
@@ -324,12 +327,29 @@ It must:
 
 ## Email policy
 
-Email delivery is deferred.
+Email delivery uses Cloudflare Email Routing's `send_email` Worker binding, following Cloudflare's Email Workers documentation.
 
-When implemented, it should:
+It sends the rendered daily report when these are present and dry-run is disabled:
 
-- Send `/tmp/MaintainerBotOut.md` or an equivalent rendered summary.
-- Include links to draft PRs once PR creation exists.
+```bash
+# Worker binding in wrangler.jsonc
+send_email.name = SEND_EMAIL
+
+# Runtime vars/secrets
+EMAIL_TO=you@example.com
+EMAIL_FROM=maintainerbot@your-routing-domain.example
+EMAIL_DRY_RUN=false
+```
+
+Prerequisites:
+
+- Cloudflare Email Routing is enabled for a domain.
+- `EMAIL_TO` is a verified Email Routing destination address.
+- `EMAIL_FROM` is from the domain where Email Routing is active.
+
+Rules:
+
+- Include draft PR links once PR creation exists.
 - Support dry-run mode.
 - Avoid sending secrets or raw logs.
 
@@ -344,7 +364,7 @@ MaintainerBot has GitHub Actions workflows:
 
 The daily workflow invokes the protected Cloudflare webhook at 09:00 UTC using the GitHub repository secret `MAINTAINERBOT_WEBHOOK_SECRET`.
 
-The CI workflow runs secret scanning and Cloudflare build checks on pushes and PRs.
+The CI workflow runs Gitleaks, local secret scanning, rejection-memory tests, and Cloudflare build checks on pushes and PRs.
 
 ## Maturity stages
 

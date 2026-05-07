@@ -1,10 +1,10 @@
 # MaintainerBot Daily Report
 
-Generated: 2026-05-07T17:01:08.022Z
+Generated: 2026-05-07T17:21:54.726Z
 
 ## Summary
 
-Scanned 47 public, non-fork, non-archived repositories. Found 4 open issues, 17 open PRs, 10 repos missing descriptions, and 10 potentially stale repos.
+Scanned 47 public, non-fork, non-archived repositories. Found 4 open issues, 17 open PRs, 10 repos missing descriptions, 1 missing READMEs, 10 package repos missing CI, and 10 package repos missing test/check scripts.
 
 - Owner: adewale
 - Mode: deterministic-no-model
@@ -12,25 +12,25 @@ Scanned 47 public, non-fork, non-archived repositories. Found 4 open issues, 17 
 
 ## Priority actions
 
-- Triage issue adewale/python-workers-skill#4: Clarify missing-value checks after jsnull/undefined cleanup
-- Triage issue adewale/geist_fabrik#78: Benchmark report: 3175-note vault on Apple M4 Pro (--debug --no-filter per-geist timings)
-- Triage issue adewale/skill_scanner#7: P0: PowerShell and cloud credential patterns missing
-- Triage issue adewale/skill_scanner#6: P0: Unicode normalization missing - homograph attacks bypass patterns
-- Review PR adewale/swiss-poster-skill#3: Add two new poster designs: Durable Objects and Lean Into Your Weirdness
-- Review PR adewale/python-workers-skill#5: cryptography and lxml work
-- Review PR adewale/vaders#7: Add difficulty curve explorer tool for game balance tuning
-- Review PR adewale/testing-best-practices#1: Add correctness-by-construction principle to testing skill
-- Review PR adewale/atlas#28: Add accessibility, keyboard nav, and view toggle features
-- Review PR adewale/visivotab#1: Migrate extension to Chrome Manifest V3
-- Review PR adewale/keyboardia#45: Audio engine review: fix 7 + 9 findings, per-track refactor, hook hardening
-- Review PR adewale/planet_cf#14: Migrate wrapper internals to CFBoundary
-- Review PR adewale/tasche#12: Migrate wrapper internals to CFBoundary
-- Review PR adewale/planet_cf#12: Add duplicate feed URL detection to _add_feed
-- Add a concise GitHub description to adewale/MaintainerBot.
-- Add a concise GitHub description to adewale/sunrise.
-- Add a concise GitHub description to adewale/bobbin.
-- Add a concise GitHub description to adewale/xampler.
-- Add a concise GitHub description to adewale/sunrise-deploy.
+- [P3] Triage issue adewale/python-workers-skill#4: Clarify missing-value checks after jsnull/undefined cleanup
+- [P3] Triage issue adewale/geist_fabrik#78: Benchmark report: 3175-note vault on Apple M4 Pro (--debug --no-filter per-geist timings)
+- [P2] Triage issue adewale/skill_scanner#7: P0: PowerShell and cloud credential patterns missing
+- [P2] Triage issue adewale/skill_scanner#6: P0: Unicode normalization missing - homograph attacks bypass patterns
+- [P3] Review PR adewale/swiss-poster-skill#3: Add two new poster designs: Durable Objects and Lean Into Your Weirdness
+- [P3] Review PR adewale/python-workers-skill#5: cryptography and lxml work
+- [P3] Review PR adewale/vaders#7: Add difficulty curve explorer tool for game balance tuning
+- [P3] Review PR adewale/testing-best-practices#1: Add correctness-by-construction principle to testing skill
+- [P3] Review PR adewale/atlas#28: Add accessibility, keyboard nav, and view toggle features
+- [P3] Review PR adewale/visivotab#1: Migrate extension to Chrome Manifest V3
+- [P1] Review PR adewale/keyboardia#45: Audio engine review: fix 7 + 9 findings, per-track refactor, hook hardening
+- [P3] Review PR adewale/planet_cf#14: Migrate wrapper internals to CFBoundary
+- [P3] Review PR adewale/tasche#12: Migrate wrapper internals to CFBoundary
+- [P3] Review PR adewale/planet_cf#12: Add duplicate feed URL detection to _add_feed
+- [P3] Add a concise GitHub description to adewale/MaintainerBot.
+- [P3] Add a concise GitHub description to adewale/sunrise.
+- [P3] Add a concise GitHub description to adewale/bobbin.
+- [P3] Add a concise GitHub description to adewale/xampler.
+- [P3] Add a concise GitHub description to adewale/sunrise-deploy.
 
 ## Open issues
 

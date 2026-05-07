@@ -3,28 +3,28 @@
   "mode": "deterministic-no-model",
   "owner": "adewale",
   "repoCount": 47,
-  "generatedAt": "2026-05-07T17:01:07.511Z",
-  "summary": "Scanned 47 public, non-fork, non-archived repositories. Found 4 open issues, 17 open PRs, 10 repos missing descriptions, and 10 potentially stale repos.",
+  "generatedAt": "2026-05-07T17:21:54.687Z",
+  "summary": "Scanned 47 public, non-fork, non-archived repositories. Found 4 open issues, 17 open PRs, 10 repos missing descriptions, 1 missing READMEs, 10 package repos missing CI, and 10 package repos missing test/check scripts.",
   "priorityActions": [
-    "Triage issue adewale/python-workers-skill#4: Clarify missing-value checks after jsnull/undefined cleanup",
-    "Triage issue adewale/geist_fabrik#78: Benchmark report: 3175-note vault on Apple M4 Pro (--debug --no-filter per-geist timings)",
-    "Triage issue adewale/skill_scanner#7: P0: PowerShell and cloud credential patterns missing",
-    "Triage issue adewale/skill_scanner#6: P0: Unicode normalization missing - homograph attacks bypass patterns",
-    "Review PR adewale/swiss-poster-skill#3: Add two new poster designs: Durable Objects and Lean Into Your Weirdness",
-    "Review PR adewale/python-workers-skill#5: cryptography and lxml work",
-    "Review PR adewale/vaders#7: Add difficulty curve explorer tool for game balance tuning",
-    "Review PR adewale/testing-best-practices#1: Add correctness-by-construction principle to testing skill",
-    "Review PR adewale/atlas#28: Add accessibility, keyboard nav, and view toggle features",
-    "Review PR adewale/visivotab#1: Migrate extension to Chrome Manifest V3",
-    "Review PR adewale/keyboardia#45: Audio engine review: fix 7 + 9 findings, per-track refactor, hook hardening",
-    "Review PR adewale/planet_cf#14: Migrate wrapper internals to CFBoundary",
-    "Review PR adewale/tasche#12: Migrate wrapper internals to CFBoundary",
-    "Review PR adewale/planet_cf#12: Add duplicate feed URL detection to _add_feed",
-    "Add a concise GitHub description to adewale/MaintainerBot.",
-    "Add a concise GitHub description to adewale/sunrise.",
-    "Add a concise GitHub description to adewale/bobbin.",
-    "Add a concise GitHub description to adewale/xampler.",
-    "Add a concise GitHub description to adewale/sunrise-deploy."
+    "[P3] Triage issue adewale/python-workers-skill#4: Clarify missing-value checks after jsnull/undefined cleanup",
+    "[P3] Triage issue adewale/geist_fabrik#78: Benchmark report: 3175-note vault on Apple M4 Pro (--debug --no-filter per-geist timings)",
+    "[P2] Triage issue adewale/skill_scanner#7: P0: PowerShell and cloud credential patterns missing",
+    "[P2] Triage issue adewale/skill_scanner#6: P0: Unicode normalization missing - homograph attacks bypass patterns",
+    "[P3] Review PR adewale/swiss-poster-skill#3: Add two new poster designs: Durable Objects and Lean Into Your Weirdness",
+    "[P3] Review PR adewale/python-workers-skill#5: cryptography and lxml work",
+    "[P3] Review PR adewale/vaders#7: Add difficulty curve explorer tool for game balance tuning",
+    "[P3] Review PR adewale/testing-best-practices#1: Add correctness-by-construction principle to testing skill",
+    "[P3] Review PR adewale/atlas#28: Add accessibility, keyboard nav, and view toggle features",
+    "[P3] Review PR adewale/visivotab#1: Migrate extension to Chrome Manifest V3",
+    "[P1] Review PR adewale/keyboardia#45: Audio engine review: fix 7 + 9 findings, per-track refactor, hook hardening",
+    "[P3] Review PR adewale/planet_cf#14: Migrate wrapper internals to CFBoundary",
+    "[P3] Review PR adewale/tasche#12: Migrate wrapper internals to CFBoundary",
+    "[P3] Review PR adewale/planet_cf#12: Add duplicate feed URL detection to _add_feed",
+    "[P3] Add a concise GitHub description to adewale/MaintainerBot.",
+    "[P3] Add a concise GitHub description to adewale/sunrise.",
+    "[P3] Add a concise GitHub description to adewale/bobbin.",
+    "[P3] Add a concise GitHub description to adewale/xampler.",
+    "[P3] Add a concise GitHub description to adewale/sunrise-deploy."
   ],
   "issues": [
     {
@@ -406,6 +406,174 @@
       "risk": "low"
     },
     {
+      "fingerprint": "adewale/fibonacci_durable_object:missing-readme:add-readme-documentation",
+      "repo": "adewale/fibonacci_durable_object",
+      "title": "Add README documentation",
+      "reason": "Repository does not expose a README at the root.",
+      "verification": "Add README with purpose, setup, run/test commands, and maintenance notes.",
+      "risk": "low"
+    },
+    {
+      "fingerprint": "adewale/sunrise:missing-ci:add-basic-ci-checks",
+      "repo": "adewale/sunrise",
+      "title": "Add basic CI checks",
+      "reason": "Package repository appears to lack GitHub Actions workflows.",
+      "verification": "Add a small CI workflow that installs dependencies and runs tests/build where available.",
+      "risk": "medium"
+    },
+    {
+      "fingerprint": "adewale/garten:missing-ci:add-basic-ci-checks",
+      "repo": "adewale/garten",
+      "title": "Add basic CI checks",
+      "reason": "Package repository appears to lack GitHub Actions workflows.",
+      "verification": "Add a small CI workflow that installs dependencies and runs tests/build where available.",
+      "risk": "medium"
+    },
+    {
+      "fingerprint": "adewale/sunrise-deploy:missing-ci:add-basic-ci-checks",
+      "repo": "adewale/sunrise-deploy",
+      "title": "Add basic CI checks",
+      "reason": "Package repository appears to lack GitHub Actions workflows.",
+      "verification": "Add a small CI workflow that installs dependencies and runs tests/build where available.",
+      "risk": "medium"
+    },
+    {
+      "fingerprint": "adewale/cf-workers-design-system:missing-ci:add-basic-ci-checks",
+      "repo": "adewale/cf-workers-design-system",
+      "title": "Add basic CI checks",
+      "reason": "Package repository appears to lack GitHub Actions workflows.",
+      "verification": "Add a small CI workflow that installs dependencies and runs tests/build where available.",
+      "risk": "medium"
+    },
+    {
+      "fingerprint": "adewale/demoscene:missing-ci:add-basic-ci-checks",
+      "repo": "adewale/demoscene",
+      "title": "Add basic CI checks",
+      "reason": "Package repository appears to lack GitHub Actions workflows.",
+      "verification": "Add a small CI workflow that installs dependencies and runs tests/build where available.",
+      "risk": "medium"
+    },
+    {
+      "fingerprint": "adewale/embed.oshineye.dev:missing-ci:add-basic-ci-checks",
+      "repo": "adewale/embed.oshineye.dev",
+      "title": "Add basic CI checks",
+      "reason": "Package repository appears to lack GitHub Actions workflows.",
+      "verification": "Add a small CI workflow that installs dependencies and runs tests/build where available.",
+      "risk": "medium"
+    },
+    {
+      "fingerprint": "adewale/atlas:missing-ci:add-basic-ci-checks",
+      "repo": "adewale/atlas",
+      "title": "Add basic CI checks",
+      "reason": "Package repository appears to lack GitHub Actions workflows.",
+      "verification": "Add a small CI workflow that installs dependencies and runs tests/build where available.",
+      "risk": "medium"
+    },
+    {
+      "fingerprint": "adewale/slide-maker:missing-ci:add-basic-ci-checks",
+      "repo": "adewale/slide-maker",
+      "title": "Add basic CI checks",
+      "reason": "Package repository appears to lack GitHub Actions workflows.",
+      "verification": "Add a small CI workflow that installs dependencies and runs tests/build where available.",
+      "risk": "medium"
+    },
+    {
+      "fingerprint": "adewale/tasche:missing-ci:add-basic-ci-checks",
+      "repo": "adewale/tasche",
+      "title": "Add basic CI checks",
+      "reason": "Package repository appears to lack GitHub Actions workflows.",
+      "verification": "Add a small CI workflow that installs dependencies and runs tests/build where available.",
+      "risk": "medium"
+    },
+    {
+      "fingerprint": "adewale/web2kindle:missing-ci:add-basic-ci-checks",
+      "repo": "adewale/web2kindle",
+      "title": "Add basic CI checks",
+      "reason": "Package repository appears to lack GitHub Actions workflows.",
+      "verification": "Add a small CI workflow that installs dependencies and runs tests/build where available.",
+      "risk": "medium"
+    },
+    {
+      "fingerprint": "adewale/MaintainerBot:missing-test-script:add-or-document-test-command",
+      "repo": "adewale/MaintainerBot",
+      "title": "Add or document test command",
+      "reason": "Package repository does not advertise a test/check script.",
+      "verification": "Add a test/check script or document why no automated test exists.",
+      "risk": "medium"
+    },
+    {
+      "fingerprint": "adewale/sunrise:missing-test-script:add-or-document-test-command",
+      "repo": "adewale/sunrise",
+      "title": "Add or document test command",
+      "reason": "Package repository does not advertise a test/check script.",
+      "verification": "Add a test/check script or document why no automated test exists.",
+      "risk": "medium"
+    },
+    {
+      "fingerprint": "adewale/garten:missing-test-script:add-or-document-test-command",
+      "repo": "adewale/garten",
+      "title": "Add or document test command",
+      "reason": "Package repository does not advertise a test/check script.",
+      "verification": "Add a test/check script or document why no automated test exists.",
+      "risk": "medium"
+    },
+    {
+      "fingerprint": "adewale/bobbin:missing-test-script:add-or-document-test-command",
+      "repo": "adewale/bobbin",
+      "title": "Add or document test command",
+      "reason": "Package repository does not advertise a test/check script.",
+      "verification": "Add a test/check script or document why no automated test exists.",
+      "risk": "medium"
+    },
+    {
+      "fingerprint": "adewale/sunrise-deploy:missing-test-script:add-or-document-test-command",
+      "repo": "adewale/sunrise-deploy",
+      "title": "Add or document test command",
+      "reason": "Package repository does not advertise a test/check script.",
+      "verification": "Add a test/check script or document why no automated test exists.",
+      "risk": "medium"
+    },
+    {
+      "fingerprint": "adewale/cf-workers-design-system:missing-test-script:add-or-document-test-command",
+      "repo": "adewale/cf-workers-design-system",
+      "title": "Add or document test command",
+      "reason": "Package repository does not advertise a test/check script.",
+      "verification": "Add a test/check script or document why no automated test exists.",
+      "risk": "medium"
+    },
+    {
+      "fingerprint": "adewale/vaders:missing-test-script:add-or-document-test-command",
+      "repo": "adewale/vaders",
+      "title": "Add or document test command",
+      "reason": "Package repository does not advertise a test/check script.",
+      "verification": "Add a test/check script or document why no automated test exists.",
+      "risk": "medium"
+    },
+    {
+      "fingerprint": "adewale/yaket:missing-test-script:add-or-document-test-command",
+      "repo": "adewale/yaket",
+      "title": "Add or document test command",
+      "reason": "Package repository does not advertise a test/check script.",
+      "verification": "Add a test/check script or document why no automated test exists.",
+      "risk": "medium"
+    },
+    {
+      "fingerprint": "adewale/demoscene:missing-test-script:add-or-document-test-command",
+      "repo": "adewale/demoscene",
+      "title": "Add or document test command",
+      "reason": "Package repository does not advertise a test/check script.",
+      "verification": "Add a test/check script or document why no automated test exists.",
+      "risk": "medium"
+    },
+    {
+      "fingerprint": "adewale/embed.oshineye.dev:missing-test-script:add-or-document-test-command",
+      "repo": "adewale/embed.oshineye.dev",
+      "title": "Add or document test command",
+      "reason": "Package repository does not advertise a test/check script.",
+      "verification": "Add a test/check script or document why no automated test exists.",
+      "risk": "medium"
+    },
+    {
       "fingerprint": "adewale/wwwoshineye:stale-repo-review:review-stale-repository-status",
       "repo": "adewale/wwwoshineye",
       "title": "Review stale repository status",
@@ -553,6 +721,47 @@
     }
   ],
   "createdDraftPrs": [],
+  "bestPractices": [
+    "adewale/fibonacci_durable_object: add or improve README.",
+    "adewale/MaintainerBot: clarify license if the project is meant for reuse.",
+    "adewale/sunrise: clarify license if the project is meant for reuse.",
+    "adewale/bobbin: clarify license if the project is meant for reuse.",
+    "adewale/xampler: clarify license if the project is meant for reuse.",
+    "adewale/sunrise-deploy: clarify license if the project is meant for reuse.",
+    "adewale/cf-workers-design-system: clarify license if the project is meant for reuse.",
+    "adewale/vaders: clarify license if the project is meant for reuse.",
+    "adewale/skill_scanner: clarify license if the project is meant for reuse."
+  ],
+  "efficiency": [
+    "adewale/sunrise: add CI so maintenance checks run automatically.",
+    "adewale/garten: add CI so maintenance checks run automatically.",
+    "adewale/sunrise-deploy: add CI so maintenance checks run automatically.",
+    "adewale/cf-workers-design-system: add CI so maintenance checks run automatically.",
+    "adewale/demoscene: add CI so maintenance checks run automatically.",
+    "adewale/embed.oshineye.dev: add CI so maintenance checks run automatically.",
+    "adewale/atlas: add CI so maintenance checks run automatically.",
+    "adewale/slide-maker: add CI so maintenance checks run automatically.",
+    "adewale/vaders: add/commit a lockfile or clarify package-manager choice.",
+    "adewale/oshineye-dev: add/commit a lockfile or clarify package-manager choice."
+  ],
+  "codeQuality": [
+    "adewale/MaintainerBot: add a test/check script or document manual verification.",
+    "adewale/sunrise: add a test/check script or document manual verification.",
+    "adewale/garten: add a test/check script or document manual verification.",
+    "adewale/bobbin: add a test/check script or document manual verification.",
+    "adewale/sunrise-deploy: add a test/check script or document manual verification.",
+    "adewale/cf-workers-design-system: add a test/check script or document manual verification.",
+    "adewale/vaders: add a test/check script or document manual verification.",
+    "adewale/yaket: add a test/check script or document manual verification.",
+    "adewale/wwwoshineye: review stale status and archive/refresh if needed.",
+    "adewale/Buzz-Chat-Bot: review stale status and archive/refresh if needed.",
+    "adewale/streamer: review stale status and archive/refresh if needed.",
+    "adewale/adewale.github.io: review stale status and archive/refresh if needed.",
+    "adewale/tools: review stale status and archive/refresh if needed.",
+    "adewale/oauthstarter: review stale status and archive/refresh if needed.",
+    "adewale/BuzzWatching: review stale status and archive/refresh if needed.",
+    "adewale/dotfiles: review stale status and archive/refresh if needed."
+  ],
   "sharedLessons": [
     "Repositories with clear descriptions are easier to triage and maintain.",
     "Daily maintenance should prioritize small, low-risk fixes and avoid repeating rejected suggestions.",

@@ -49,8 +49,11 @@ function md(report) {
   const openPrs = (report.pullRequests ?? []).map((item) => `- [${item.repo}#${item.number}](${item.url}) ${item.title} — ${item.ageDays}d old, ${item.comments} comments, labels: ${(item.labels ?? []).join(', ') || 'none'}`).join('\n') || '- No open PRs found.';
   const candidates = (report.draftPrCandidates ?? []).map((pr) => `### ${pr.repo}: ${pr.title}\n\n- Fingerprint: \`${pr.fingerprint ?? 'n/a'}\`\n- Risk: ${pr.risk}\n- Reason: ${pr.reason}\n- Verification: ${pr.verification}\n`).join('\n') || 'No draft PR candidates.';
   const created = (report.createdDraftPrs ?? []).map((pr) => `- ${pr.status}: ${pr.repo}${pr.url ? ` — ${pr.url}` : ''}${pr.reason ? ` — ${pr.reason}` : ''}`).join('\n') || '- No draft PRs created.';
+  const bestPractices = (report.bestPractices ?? []).map((x) => `- ${x}`).join('\n') || '- No best-practice findings.';
+  const efficiency = (report.efficiency ?? []).map((x) => `- ${x}`).join('\n') || '- No efficiency findings.';
+  const codeQuality = (report.codeQuality ?? []).map((x) => `- ${x}`).join('\n') || '- No code-quality findings.';
   const lessons = (report.sharedLessons ?? []).map((x) => `- ${x}`).join('\n') || '- No shared lessons.';
-  return `# MaintainerBot Daily Report\n\nGenerated: ${new Date().toISOString()}\n\n## Summary\n\n${report.summary}\n\n- Owner: ${report.owner}\n- Mode: ${report.mode}\n- Repositories scanned: ${report.repoCount}\n\n## Priority actions\n\n${actions}\n\n## Open issues\n\n${issues}\n\n## Open pull requests\n\n${openPrs}\n\n## Draft PR candidates\n\n${candidates}\n\n## Draft PR creation results\n\n${created}\n\n## Shared lessons\n\n${lessons}\n`;
+  return `# MaintainerBot Daily Report\n\nGenerated: ${new Date().toISOString()}\n\n## Summary\n\n${report.summary}\n\n- Owner: ${report.owner}\n- Mode: ${report.mode}\n- Repositories scanned: ${report.repoCount}\n\n## Priority actions\n\n${actions}\n\n## Open issues\n\n${issues}\n\n## Open pull requests\n\n${openPrs}\n\n## Best practices\n\n${bestPractices}\n\n## Efficiency\n\n${efficiency}\n\n## Code quality\n\n${codeQuality}\n\n## Draft PR candidates\n\n${candidates}\n\n## Draft PR creation results\n\n${created}\n\n## Shared lessons\n\n${lessons}\n`;
 }
 
 const markdown = md(report);
