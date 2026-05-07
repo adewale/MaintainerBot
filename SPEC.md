@@ -132,9 +132,10 @@ pnpm run deploy:cloudflare
 Cloudflare invocation:
 
 ```bash
+SECRET=$(cat .webhook-secret)
 curl -X POST https://maintainerbot.<subdomain>.workers.dev/agents/daily-maintenance/daily \
   -H 'Content-Type: application/json' \
-  -d '{}'
+  -d "{\"webhookSecret\":\"$SECRET\"}"
 ```
 
 ### Configuration
@@ -176,6 +177,7 @@ Rules:
 
 Current safety rules:
 
+- The Cloudflare webhook requires `MAINTAINERBOT_WEBHOOK_SECRET` when that secret is configured.
 - No PR creation by default.
 - No email sending by default.
 - No repository mutation by default.

@@ -65,7 +65,8 @@ Deferred work and future milestones.
 - [x] Store rejections, lessons, latest reports, and historic reports in R2.
 - [x] Deploy webhook agent to Cloudflare.
 - [ ] Add a daily scheduler that invokes the Cloudflare webhook.
-- [ ] Add auth protection for the public webhook endpoint.
+- [x] Add shared-secret protection for the public webhook endpoint.
+- [ ] Consider moving from payload secret to header-based auth if Flue exposes request headers.
 
 ## Flue/runtime evolution
 

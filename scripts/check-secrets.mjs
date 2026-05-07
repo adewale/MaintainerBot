@@ -50,6 +50,7 @@ for (const file of await walk(root)) {
       const value = match[0];
       if (allowedExamples.some((example) => value.includes(example))) continue;
       if (rel === '.env.example') continue;
+      if (pattern.name === 'Env assignment with secret-ish name' && value.includes(' = env.')) continue;
       if (pattern.name === 'Cloudflare API token-like value' && !/(TOKEN|SECRET|API_KEY|Authorization|Bearer)/i.test(text.slice(Math.max(0, match.index - 80), match.index + 80))) continue;
       const line = text.slice(0, match.index).split('\n').length;
       findings.push({ file: rel, line, type: pattern.name, value: value.slice(0, 12) + '…' });

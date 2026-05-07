@@ -2,6 +2,7 @@ node_modules
 .env
 .env.*
 !.env.example
+.webhook-secret
 dist
 .wrangler
 .DS_Store

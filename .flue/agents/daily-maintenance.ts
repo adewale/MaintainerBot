@@ -67,7 +67,12 @@ const ReportSchema = v.object({
 	sharedLessons: v.array(v.string()),
 });
 
-export default async function ({ init, env }: FlueContext) {
+export default async function ({ init, env, payload }: FlueContext) {
+	const configuredSecret = env.MAINTAINERBOT_WEBHOOK_SECRET;
+	if (configuredSecret && payload?.webhookSecret !== configuredSecret) {
+		return { ok: false, error: 'Unauthorized' };
+	}
+
 	const fs = new InMemoryFs();
 	const sandbox = () =>
 		new Bash({ fs, cwd: '/workspace', python: true, network: { dangerouslyAllowFullInternetAccess: true } });

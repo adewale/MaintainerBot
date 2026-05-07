@@ -118,17 +118,19 @@ Build and deploy:
 pnpm run deploy:cloudflare
 ```
 
-Invoke the deployed agent:
+Invoke the deployed agent with the protected webhook secret:
 
 ```bash
+SECRET=$(cat .webhook-secret)
 curl -X POST https://maintainerbot.<your-subdomain>.workers.dev/agents/daily-maintenance/daily \
   -H 'Content-Type: application/json' \
-  -d '{}'
+  -d "{\"webhookSecret\":\"$SECRET\"}"
 ```
 
 Set secrets when needed:
 
 ```bash
+pnpm exec wrangler secret put MAINTAINERBOT_WEBHOOK_SECRET
 pnpm exec wrangler secret put GITHUB_TOKEN
 pnpm exec wrangler secret put ANTHROPIC_API_KEY
 ```
