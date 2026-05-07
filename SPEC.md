@@ -239,7 +239,10 @@ Current report sections:
 
 - Summary
 - Priority actions
-- Draft PR candidates
+- Open issues with links, age, labels, comments, and author
+- Open pull requests with links, age, labels, comments, and author
+- Draft PR candidates with stable fingerprints
+- Draft PR creation results
 - Shared lessons
 
 ## Rejection memory
@@ -291,9 +294,19 @@ Examples:
 
 ## Draft PR policy
 
-Draft PR creation is deferred.
+Draft PR creation is implemented but disabled by default.
 
-When implemented, it must:
+It only runs when all of the following are true:
+
+```bash
+CREATE_DRAFT_PRS=true
+GITHUB_TOKEN=...
+DRAFT_PR_REPO_ALLOWLIST=adewale/example,adewale/another-example
+```
+
+When enabled, MaintainerBot currently creates small draft PRs for allowlisted repositories only. The first implementation writes a `MAINTAINERBOT.md` recommendation file on a `maintainerbot/*` branch and opens a draft PR with verification notes. This is intentionally conservative and should evolve toward real verified fixes.
+
+It must:
 
 1. Use a strict allowlist of repositories.
 2. Create small branches only.
@@ -319,6 +332,19 @@ When implemented, it should:
 - Include links to draft PRs once PR creation exists.
 - Support dry-run mode.
 - Avoid sending secrets or raw logs.
+
+## Scheduling and CI
+
+MaintainerBot has GitHub Actions workflows:
+
+```txt
+.github/workflows/daily-maintenance.yml
+.github/workflows/ci.yml
+```
+
+The daily workflow invokes the protected Cloudflare webhook at 09:00 UTC using the GitHub repository secret `MAINTAINERBOT_WEBHOOK_SECRET`.
+
+The CI workflow runs secret scanning and Cloudflare build checks on pushes and PRs.
 
 ## Maturity stages
 

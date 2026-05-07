@@ -1,0 +1,19 @@
+name: Daily MaintainerBot Run
+
+on:
+  schedule:
+    - cron: "0 9 * * *"
+  workflow_dispatch:
+
+jobs:
+  invoke:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Invoke protected Cloudflare webhook
+        env:
+          MAINTAINERBOT_WEBHOOK_SECRET: ${{ secrets.MAINTAINERBOT_WEBHOOK_SECRET }}
+        run: |
+          test -n "$MAINTAINERBOT_WEBHOOK_SECRET"
+          curl --fail-with-body -X POST "https://maintainerbot.adewale-883.workers.dev/agents/daily-maintenance/daily" \
+            -H "Content-Type: application/json" \
+            -d "{\"webhookSecret\":\"$MAINTAINERBOT_WEBHOOK_SECRET\"}"

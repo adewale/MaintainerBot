@@ -6,18 +6,19 @@ Deferred work and future milestones.
 
 - [x] Keep dated daily report history in `reports/daily-maintenance-YYYY-MM-DD.*`.
 - [x] Emit the primary latest report to `/tmp/MaintainerBotOut.md`.
-- [ ] Improve the daily Markdown report format.
-- [ ] Add sections for issues, PRs, best practices, lessons learned, efficiency, code quality, and shared lessons.
+- [x] Improve the daily Markdown report format.
+- [x] Add sections for issues, PRs, draft PR creation results, and shared lessons.
+- [ ] Add dedicated sections for best practices, lessons learned, efficiency, and code quality.
 - [ ] Add severity/priority scoring.
-- [ ] Add stable fingerprints for every recommendation.
-- [ ] Add links to source evidence for each recommendation.
+- [x] Add stable fingerprints for every deterministic recommendation.
+- [x] Add links to source evidence for issue/PR items.
 
 ## GitHub scanning
 
-- [ ] Fetch detailed open issues per repository.
-- [ ] Fetch detailed open PRs per repository.
-- [ ] Include issue/PR age, labels, comment count, assignees, and last activity.
-- [ ] Detect stale issues and PRs.
+- [x] Fetch detailed open issues across the owner account.
+- [x] Fetch detailed open PRs across the owner account.
+- [x] Include issue/PR age, labels, comment count, author, and last activity.
+- [x] Detect stale issues and PRs.
 - [ ] Detect repos missing README, LICENSE, CI, tests, or package scripts.
 - [ ] Detect dependency/tooling health signals.
 
@@ -31,18 +32,18 @@ Deferred work and future milestones.
 
 ## Draft PR creation
 
-- [ ] Keep `CREATE_DRAFT_PRS=false` until reporting is reliable.
-- [ ] Add a strict allowlist for repos where PR creation is allowed.
-- [ ] Create branches for low-risk changes only.
-- [ ] Open draft PRs with clear titles, summaries, and verification notes.
-- [ ] Never create a PR matching a rejected fingerprint.
-- [ ] Record every created PR in a local/state ledger.
+- [x] Keep `CREATE_DRAFT_PRS=false` until reporting is reliable.
+- [x] Add a strict allowlist for repos where PR creation is allowed.
+- [x] Create branches for low-risk changes only when explicitly enabled.
+- [x] Open draft PRs with clear titles, summaries, and verification notes when explicitly enabled.
+- [x] Never create a PR matching a rejected fingerprint.
+- [ ] Record every created PR in an R2 ledger.
 
 ## Rejection memory
 
-- [ ] Expand `data/rejections.json` schema.
+- [x] Expand `data/rejections.json` schema in the spec.
 - [ ] Add command/script to record rejected ideas.
-- [ ] Add fingerprint matching so rejected ideas are filtered before reporting.
+- [x] Add fingerprint matching so rejected ideas are filtered before reporting.
 - [ ] Add tests for rejection filtering.
 
 ## Email delivery
@@ -55,7 +56,7 @@ Deferred work and future milestones.
 ## Scheduling
 
 - [ ] Add local cron instructions.
-- [ ] Add GitHub Actions scheduled workflow.
+- [x] Add GitHub Actions scheduled workflow.
 - [ ] Consider Cloudflare scheduled Worker deployment later.
 
 ## Cloudflare/R2 deployment
@@ -64,7 +65,7 @@ Deferred work and future milestones.
 - [x] Create/bind R2 bucket `maintainerbot-data`.
 - [x] Store rejections, lessons, latest reports, and historic reports in R2.
 - [x] Deploy webhook agent to Cloudflare.
-- [ ] Add a daily scheduler that invokes the Cloudflare webhook.
+- [x] Add a daily scheduler that invokes the Cloudflare webhook.
 - [x] Add shared-secret protection for the public webhook endpoint.
 - [ ] Consider moving from payload secret to header-based auth if Flue exposes request headers.
 
@@ -79,7 +80,7 @@ Deferred work and future milestones.
 
 - [x] Ignore `.env` and `.env.*` files while keeping `.env.example`.
 - [x] Add `pnpm run check:secrets`.
-- [ ] Add a GitHub Actions check that runs `pnpm run check:secrets` on PRs.
+- [x] Add a GitHub Actions check that runs `pnpm run check:secrets` on PRs.
 - [ ] Consider adding gitleaks/trufflehog for stronger scanning.
 
 ## Documentation

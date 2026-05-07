@@ -43,6 +43,7 @@ For now, MaintainerBot is intentionally conservative:
 /tmp/MaintainerBotOut.md
 ```
 
+- It has a GitHub Actions daily schedule that invokes the protected Cloudflare webhook at 09:00 UTC.
 - In Cloudflare mode, it keeps all durable data in R2:
 
 ```txt
@@ -93,7 +94,7 @@ Primary output:
 /tmp/MaintainerBotOut.md
 ```
 
-Secondary outputs:
+Secondary local outputs:
 
 ```txt
 reports/daily-maintenance.md
@@ -103,6 +104,20 @@ reports/daily-maintenance-YYYY-MM-DD.json
 ```
 
 Dated daily reports are intended to be committed so we keep report history. Mutable latest files and logs are ignored by git.
+
+## Daily scheduling
+
+The deployed bot runs daily through:
+
+```txt
+.github/workflows/daily-maintenance.yml
+```
+
+That workflow uses the GitHub repository secret:
+
+```txt
+MAINTAINERBOT_WEBHOOK_SECRET
+```
 
 ## Deploy to Cloudflare
 
@@ -137,13 +152,13 @@ pnpm exec wrangler secret put ANTHROPIC_API_KEY
 
 ## Safety
 
-Draft PR creation is intentionally not enabled by default. Keep:
+Draft PR creation is implemented but intentionally not enabled by default. Keep:
 
 ```bash
 CREATE_DRAFT_PRS=false
 ```
 
-until the scan/report loop is producing useful recommendations.
+until the scan/report loop is producing useful recommendations. To enable it later, set `CREATE_DRAFT_PRS=true`, provide a `GITHUB_TOKEN`, and set `DRAFT_PR_REPO_ALLOWLIST` to the exact repos allowed to receive draft PRs.
 
 Rejected ideas should be tracked in:
 
