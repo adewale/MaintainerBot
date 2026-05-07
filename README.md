@@ -157,6 +157,18 @@ Shared lessons should be tracked in:
 data/lessons.md
 ```
 
+## Webhook security
+
+The Cloudflare webhook is protected by a shared secret:
+
+```txt
+MAINTAINERBOT_WEBHOOK_SECRET
+```
+
+The source code can be public because it only contains the check, not the secret value. The real secret lives in Cloudflare Worker secrets and local ignored files such as `.webhook-secret` or `.env`.
+
+An attacker can see that a secret is required, but cannot run the job without knowing the secret value.
+
 ## Secret hygiene
 
 Before committing or pushing, run:

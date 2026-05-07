@@ -187,6 +187,38 @@ Current safety rules:
 - Every proposed fix should include a verification step.
 - If evidence is weak, recommend investigation instead of action.
 
+### Protected webhook security rationale
+
+The deployed Cloudflare webhook is safe to keep in a public source-code repository because the repository contains only the **verification logic**, not the **secret value**.
+
+Public code includes this behavior:
+
+```txt
+if MAINTAINERBOT_WEBHOOK_SECRET is configured, require payload.webhookSecret to match it
+```
+
+The actual secret is stored outside git:
+
+```txt
+Local development: .webhook-secret or .env, both ignored by git
+Production: Cloudflare Worker secret MAINTAINERBOT_WEBHOOK_SECRET
+```
+
+This means an attacker can read the source code and know that a secret is required, but cannot invoke the protected job unless they also know the secret value. This is the same security pattern used by API keys, bearer tokens, and webhook signing secrets: the algorithm/check can be public, while the secret remains private.
+
+Current limitations:
+
+- The secret is sent in the JSON payload because Flue agent handlers currently expose `payload` and `env`, not raw request headers.
+- Payload-based shared-secret auth is sufficient for a private scheduled caller over HTTPS, but header-based auth would be cleaner if/when Flue exposes request headers.
+- If the secret is leaked, rotate it with `wrangler secret put MAINTAINERBOT_WEBHOOK_SECRET` and update `.webhook-secret` locally.
+
+Operational rules:
+
+- Never commit `.webhook-secret`, `.env`, or any real token.
+- Use HTTPS only.
+- Rotate the webhook secret if it is exposed in logs, screenshots, shell history, or chat.
+- Prefer a dedicated random secret, not a reused password or API token.
+
 ## Report contract
 
 The daily report should eventually include:
