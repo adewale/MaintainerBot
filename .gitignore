@@ -3,6 +3,7 @@ node_modules
 .env.*
 !.env.example
 dist
+.wrangler
 .DS_Store
 
 # Logs can contain raw command output; do not commit them.

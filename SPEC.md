@@ -10,19 +10,39 @@ It should help maintain many repositories by scanning project activity and quali
 
 ## Current status
 
-MaintainerBot currently runs as a local Flue project and emits a daily Markdown report to:
+MaintainerBot currently runs in two modes:
+
+1. Local Flue/Node mode, which emits a daily Markdown report to:
 
 ```txt
 /tmp/MaintainerBotOut.md
 ```
 
-It also writes local debug/history artifacts under:
+2. Cloudflare Worker mode, which keeps durable data in R2:
+
+```txt
+R2 bucket: maintainerbot-data
+Binding: MAINTAINERBOT_R2
+```
+
+R2 keys:
+
+```txt
+data/rejections.json
+data/lessons.md
+reports/daily-maintenance-latest.md
+reports/daily-maintenance-latest.json
+reports/history/YYYY-MM-DD/daily-maintenance.md
+reports/history/YYYY-MM-DD/daily-maintenance.json
+```
+
+Local debug/history artifacts may also be written under:
 
 ```txt
 reports/
 ```
 
-Dated reports under `reports/daily-maintenance-YYYY-MM-DD.*` are intentionally kept as history. Mutable latest files and logs are ignored.
+Dated local reports under `reports/daily-maintenance-YYYY-MM-DD.*` are intentionally kept as history. Mutable latest files and logs are ignored.
 
 Current mode is conservative reporting only:
 
@@ -93,17 +113,28 @@ Daily runner:
 scripts/run-daily.mjs
 ```
 
-### Current command
+### Current commands
+
+Local run:
 
 ```bash
 cd /Users/adewale/Documents/projects/code/flue-onboarding/MaintainerBot
 pnpm run save:daily
 ```
 
-Primary output:
+Cloudflare deploy:
 
-```txt
-/tmp/MaintainerBotOut.md
+```bash
+pnpm exec wrangler r2 bucket create maintainerbot-data
+pnpm run deploy:cloudflare
+```
+
+Cloudflare invocation:
+
+```bash
+curl -X POST https://maintainerbot.<subdomain>.workers.dev/agents/daily-maintenance/daily \
+  -H 'Content-Type: application/json' \
+  -d '{}'
 ```
 
 ### Configuration

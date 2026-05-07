@@ -37,13 +37,31 @@ For now, MaintainerBot is intentionally conservative:
 - It scans and reports.
 - It does **not** create PRs by default.
 - It does **not** send email by default.
-- It emits the main human-readable report to:
+- In local mode, it emits the main human-readable report to:
 
 ```txt
 /tmp/MaintainerBotOut.md
 ```
 
-It also keeps local copies under `reports/` for debugging/history.
+- In Cloudflare mode, it keeps all durable data in R2:
+
+```txt
+R2 bucket: maintainerbot-data
+Binding: MAINTAINERBOT_R2
+```
+
+R2 keys:
+
+```txt
+data/rejections.json
+data/lessons.md
+reports/daily-maintenance-latest.md
+reports/daily-maintenance-latest.json
+reports/history/YYYY-MM-DD/daily-maintenance.md
+reports/history/YYYY-MM-DD/daily-maintenance.json
+```
+
+Local copies under `reports/` are for local debugging/history only.
 
 ## Setup
 
@@ -63,7 +81,7 @@ ANTHROPIC_API_KEY=...
 CREATE_DRAFT_PRS=false
 ```
 
-## Run
+## Run locally
 
 ```bash
 pnpm run save:daily
@@ -85,6 +103,35 @@ reports/daily-maintenance-YYYY-MM-DD.json
 ```
 
 Dated daily reports are intended to be committed so we keep report history. Mutable latest files and logs are ignored by git.
+
+## Deploy to Cloudflare
+
+Create the R2 bucket once:
+
+```bash
+pnpm exec wrangler r2 bucket create maintainerbot-data
+```
+
+Build and deploy:
+
+```bash
+pnpm run deploy:cloudflare
+```
+
+Invoke the deployed agent:
+
+```bash
+curl -X POST https://maintainerbot.<your-subdomain>.workers.dev/agents/daily-maintenance/daily \
+  -H 'Content-Type: application/json' \
+  -d '{}'
+```
+
+Set secrets when needed:
+
+```bash
+pnpm exec wrangler secret put GITHUB_TOKEN
+pnpm exec wrangler secret put ANTHROPIC_API_KEY
+```
 
 ## Safety
 

@@ -58,6 +58,15 @@ Deferred work and future milestones.
 - [ ] Add GitHub Actions scheduled workflow.
 - [ ] Consider Cloudflare scheduled Worker deployment later.
 
+## Cloudflare/R2 deployment
+
+- [x] Add Cloudflare Worker build/deploy scripts.
+- [x] Create/bind R2 bucket `maintainerbot-data`.
+- [x] Store rejections, lessons, latest reports, and historic reports in R2.
+- [x] Deploy webhook agent to Cloudflare.
+- [ ] Add a daily scheduler that invokes the Cloudflare webhook.
+- [ ] Add auth protection for the public webhook endpoint.
+
 ## Flue/runtime evolution
 
 - [ ] Keep current local `just-bash` scan path simple.
