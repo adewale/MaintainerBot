@@ -28,13 +28,18 @@ Binding: MAINTAINERBOT_R2
 R2 keys:
 
 ```txt
+MaintainerBotOut.md              # latest living Markdown status page
+MaintainerBotOut.json            # latest machine-readable status
 data/rejections.json
 data/lessons.md
+data/created-prs.json
 reports/daily-maintenance-latest.md
 reports/daily-maintenance-latest.json
 reports/history/YYYY-MM-DD/daily-maintenance.md
 reports/history/YYYY-MM-DD/daily-maintenance.json
 ```
+
+Primary product interface: `MaintainerBotOut.md` in R2. Every run overwrites this object with the latest effective status of all scanned projects. Historic reports remain immutable-ish dated snapshots under `reports/history/`.
 
 Local debug/history artifacts may also be written under:
 
@@ -324,6 +329,24 @@ It must:
    - Risk level
 7. Record created PRs in a local ledger.
 8. Never repeat rejected fingerprints.
+
+## Status page policy
+
+The primary output should be a living Markdown status page in R2:
+
+```txt
+MaintainerBotOut.md
+```
+
+It should always represent the latest effective status across all scanned projects. This is preferred over email because it is bookmarkable, shareable, low-noise, easy to diff, and can later be served as HTML by a Worker while keeping the R2 bucket private.
+
+The JSON equivalent is:
+
+```txt
+MaintainerBotOut.json
+```
+
+Email should be treated as an optional alerting channel for important events, not the main interface.
 
 ## Email policy
 

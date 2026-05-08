@@ -54,13 +54,18 @@ Binding: MAINTAINERBOT_R2
 R2 keys:
 
 ```txt
+MaintainerBotOut.md              # latest living Markdown status page
+MaintainerBotOut.json            # latest machine-readable status
 data/rejections.json
 data/lessons.md
+data/created-prs.json
 reports/daily-maintenance-latest.md
 reports/daily-maintenance-latest.json
 reports/history/YYYY-MM-DD/daily-maintenance.md
 reports/history/YYYY-MM-DD/daily-maintenance.json
 ```
+
+The preferred interface is now the living R2 status file, `MaintainerBotOut.md`. Each run overwrites it with the effective current status of all scanned projects while still preserving dated history under `reports/history/`.
 
 Local copies under `reports/` are for local debugging/history only.
 

@@ -14,12 +14,33 @@ The agent:
 4. Builds deterministic recommendations with stable fingerprints.
 5. Optionally uses an LLM for richer recommendations.
 6. Optionally creates gated draft PRs for allowlisted repos.
-7. Writes latest and historic reports to R2.
-8. Optionally sends email via Resend.
+7. Writes the living status page, latest aliases, and historic reports to R2.
+8. Optionally sends email via Cloudflare Email Routing.
 
 ## Storage
 
 Cloudflare R2 is the durable storage layer.
+
+Primary latest status objects:
+
+```txt
+MaintainerBotOut.md
+MaintainerBotOut.json
+```
+
+Latest aliases:
+
+```txt
+reports/daily-maintenance-latest.md
+reports/daily-maintenance-latest.json
+```
+
+Historic snapshots:
+
+```txt
+reports/history/YYYY-MM-DD/daily-maintenance.md
+reports/history/YYYY-MM-DD/daily-maintenance.json
+```
 
 ## Runtime
 

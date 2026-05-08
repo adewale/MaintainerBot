@@ -43,6 +43,8 @@ maintainerbot-data
 Important keys:
 
 ```txt
+MaintainerBotOut.md
+MaintainerBotOut.json
 data/rejections.json
 data/lessons.md
 data/created-prs.json
@@ -52,7 +54,13 @@ reports/history/YYYY-MM-DD/daily-maintenance.md
 reports/history/YYYY-MM-DD/daily-maintenance.json
 ```
 
-Download latest report:
+Download the living status page:
+
+```bash
+pnpm exec wrangler r2 object get maintainerbot-data/MaintainerBotOut.md --remote --file /tmp/MaintainerBotOut.md
+```
+
+Download latest report alias:
 
 ```bash
 pnpm exec wrangler r2 object get maintainerbot-data/reports/daily-maintenance-latest.md --remote --file /tmp/MaintainerBotR2Latest.md

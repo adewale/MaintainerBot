@@ -304,6 +304,8 @@ async function writeReportToR2(bucket: R2BucketLike, report: MaintenanceReport) 
 	const markdown = renderMarkdown(report);
 	const json = `${JSON.stringify(report, null, 2)}\n`;
 	const keys = [
+		`MaintainerBotOut.md`,
+		`MaintainerBotOut.json`,
 		`reports/daily-maintenance-latest.md`,
 		`reports/daily-maintenance-latest.json`,
 		`reports/history/${day}/daily-maintenance.md`,
@@ -313,6 +315,8 @@ async function writeReportToR2(bucket: R2BucketLike, report: MaintenanceReport) 
 	await bucket.put(keys[1], json, { httpMetadata: { contentType: 'application/json' } });
 	await bucket.put(keys[2], markdown, { httpMetadata: { contentType: 'text/markdown; charset=utf-8' } });
 	await bucket.put(keys[3], json, { httpMetadata: { contentType: 'application/json' } });
+	await bucket.put(keys[4], markdown, { httpMetadata: { contentType: 'text/markdown; charset=utf-8' } });
+	await bucket.put(keys[5], json, { httpMetadata: { contentType: 'application/json' } });
 	return keys;
 }
 

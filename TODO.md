@@ -4,8 +4,9 @@ Deferred work and future milestones.
 
 ## Reporting
 
-- [x] Keep dated daily report history in `reports/daily-maintenance-YYYY-MM-DD.*`.
-- [x] Emit the primary latest report to `/tmp/MaintainerBotOut.md`.
+- [x] Keep dated daily report history in `reports/daily-maintenance-YYYY-MM-DD.*` locally and `reports/history/YYYY-MM-DD/*` in R2.
+- [x] Emit the primary latest local report to `/tmp/MaintainerBotOut.md`.
+- [x] Emit the primary latest Cloudflare/R2 living status page to `MaintainerBotOut.md`.
 - [x] Improve the daily Markdown report format.
 - [x] Add sections for issues, PRs, draft PR creation results, and shared lessons.
 - [x] Add dedicated sections for best practices, lessons learned, efficiency, and code quality.
