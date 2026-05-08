@@ -151,10 +151,12 @@ export default async function ({ init, env, payload }: FlueContext) {
 	await session.shell(`cat > /workspace/data/rejections.json <<'EOF'\n${rejections}\nEOF`);
 	await session.shell(`cat > /workspace/data/lessons.md <<'EOF'\n${lessons}\nEOF`);
 
-	const repos = await fetchRepos(owner, githubHeaders);
+	const cutoff = new Date(Date.now() - 365 * 24 * 60 * 60 * 1000).toISOString();
+	const repos = (await fetchRepos(owner, githubHeaders)).filter((repo) => repo.pushedAt && repo.pushedAt >= cutoff);
 	await session.shell(`cat > /workspace/reports/repo-summary.json <<'EOF'\n${JSON.stringify(repos, null, 2)}\nEOF`);
-	const issues = await fetchSearchItems(`user:${owner} is:issue is:open`, githubHeaders);
-	const pullRequests = await fetchSearchItems(`user:${owner} is:pr is:open`, githubHeaders);
+	const repoNames = new Set(repos.map((repo) => repo.fullName));
+	const issues = (await fetchSearchItems(`user:${owner} is:issue is:open`, githubHeaders)).filter((item) => repoNames.has(item.repo));
+	const pullRequests = (await fetchSearchItems(`user:${owner} is:pr is:open`, githubHeaders)).filter((item) => repoNames.has(item.repo));
 
 	const generatedAt = new Date().toISOString();
 	const deterministic = buildDeterministicReport(repos, issues, pullRequests, rejected);
@@ -349,7 +351,7 @@ function buildDeterministicReport(repos: RepoSummary[], issues: WorkItem[], pull
 		...stale.map((repo) => recommendation(repo.fullName, 'stale-repo-review', 'Review stale repository status', 'Repository has not been pushed recently.', 'Confirm whether the repo should be archived, refreshed, or documented as complete.', 'low' as const)),
 	].filter((item) => !rejected.has(item.fingerprint));
 	return {
-		summary: `Scanned ${repos.length} public, non-fork, non-archived repositories. Found ${issues.length} open issues, ${pullRequests.length} open PRs, ${needsDescription.length} repos missing descriptions, ${missingReadme.length} missing READMEs, ${missingCi.length} package repos missing CI, and ${missingTests.length} package repos missing test/check scripts.`,
+		summary: `Scanned ${repos.length} public, non-fork, non-archived repositories updated in the last year. Found ${issues.length} open issues, ${pullRequests.length} open PRs, ${needsDescription.length} repos missing descriptions, ${missingReadme.length} missing READMEs, ${missingCi.length} package repos missing CI, and ${missingTests.length} package repos missing test/check scripts.`,
 		priorityActions: [
 			...issues.slice(0, 10).map((issue) => `${priority(issue)} Triage issue ${issue.repo}#${issue.number}: ${issue.title}`),
 			...pullRequests.slice(0, 10).map((pr) => `${priority(pr)} Review PR ${pr.repo}#${pr.number}: ${pr.title}`),

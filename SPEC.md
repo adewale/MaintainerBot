@@ -4,9 +4,9 @@ This is the evergreen product and technical spec for MaintainerBot. Keep this fi
 
 ## Product intent
 
-MaintainerBot is a daily open-source maintenance assistant for Adewale's projects.
+MaintainerBot is a daily open-source maintenance assistant for Adewale's recently active projects.
 
-It should help maintain many repositories by scanning project activity and quality signals, recommending concrete next steps, learning from accepted/rejected suggestions, and eventually preparing safe draft PRs with verification evidence.
+It should help maintain many repositories by scanning project activity and quality signals, recommending concrete next steps, learning from accepted/rejected suggestions, and eventually preparing safe draft PRs with verification evidence. By default, the scan includes only repositories updated in the last year.
 
 ## Current status
 
