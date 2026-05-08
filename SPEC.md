@@ -47,6 +47,19 @@ The R2 dev URL is public:
 https://pub-39149b57d8394ddea78c0ca9f90e087f.r2.dev/MaintainerBotOut.md
 ```
 
+A small status Worker renders the Markdown as pretty HTML:
+
+```txt
+https://maintainerbot-status.adewale-883.workers.dev
+```
+
+The status Worker lives in:
+
+```txt
+workers/status.ts
+wrangler.status.jsonc
+```
+
 Local debug/history artifacts may also be written under:
 
 ```txt

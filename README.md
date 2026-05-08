@@ -79,6 +79,20 @@ Public latest JSON URL:
 https://pub-39149b57d8394ddea78c0ca9f90e087f.r2.dev/MaintainerBotOut.json
 ```
 
+Pretty HTML status page served by a Worker:
+
+```txt
+https://maintainerbot-status.adewale-883.workers.dev
+```
+
+Status Worker raw routes:
+
+```txt
+/raw
+/json
+/health
+```
+
 Local copies under `reports/` are for local debugging/history only.
 
 ## Setup

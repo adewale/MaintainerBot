@@ -66,6 +66,18 @@ Public latest JSON:
 https://pub-39149b57d8394ddea78c0ca9f90e087f.r2.dev/MaintainerBotOut.json
 ```
 
+Pretty HTML status Worker:
+
+```txt
+https://maintainerbot-status.adewale-883.workers.dev
+```
+
+Deploy the status Worker:
+
+```bash
+pnpm run deploy:status
+```
+
 Download the living status page:
 
 ```bash

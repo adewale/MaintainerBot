@@ -8,6 +8,7 @@
     "dev": "flue dev --target node --env .env",
     "dev:cloudflare": "flue dev --target cloudflare --env .env",
     "deploy:cloudflare": "flue build --target cloudflare --output . && wrangler deploy --config dist/wrangler.jsonc",
+    "deploy:status": "wrangler deploy --config wrangler.status.jsonc",
     "daily": "flue run daily-maintenance --target node --id daily --payload '{}' --env .env --output .",
     "save:daily": "node scripts/run-daily.mjs",
     "reject": "node scripts/reject.mjs",

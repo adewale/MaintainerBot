@@ -1,0 +1,13 @@
+{
+  "$schema": "https://workers.cloudflare.com/schema/wrangler.json",
+  "name": "maintainerbot-status",
+  "main": "workers/status.ts",
+  "compatibility_date": "2026-04-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "r2_buckets": [
+    {
+      "binding": "MAINTAINERBOT_R2",
+      "bucket_name": "maintainerbot-data"
+    }
+  ]
+}
