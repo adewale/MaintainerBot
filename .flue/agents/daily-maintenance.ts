@@ -323,16 +323,83 @@ async function writeReportToR2(bucket: R2BucketLike, report: MaintenanceReport) 
 }
 
 function renderMarkdown(report: MaintenanceReport) {
-	const actions = report.priorityActions.map((action) => `- ${action}`).join('\n') || '- No priority actions.';
-	const issueMd = report.issues.map((item) => `- [${item.repo}#${item.number}](${item.url}) ${item.title} — ${item.ageDays}d old, ${item.comments} comments, labels: ${item.labels.join(', ') || 'none'}`).join('\n') || '- No open issues found.';
-	const prMd = report.pullRequests.map((item) => `- [${item.repo}#${item.number}](${item.url}) ${item.title} — ${item.ageDays}d old, ${item.comments} comments, labels: ${item.labels.join(', ') || 'none'}`).join('\n') || '- No open PRs found.';
-	const recs = report.draftPrCandidates.map((pr) => `### ${pr.repo}: ${pr.title}\n\n- Fingerprint: \`${pr.fingerprint}\`\n- Risk: ${pr.risk}\n- Reason: ${pr.reason}\n- Verification: ${pr.verification}\n`).join('\n') || 'No draft PR candidates.';
+	const sortedIssues = [...report.issues].sort(compareWorkItems);
+	const sortedPrs = [...report.pullRequests].sort(compareWorkItems);
+	const sortedCandidates = [...report.draftPrCandidates].sort(compareRecommendations);
+	const inbox = buildActionInbox(sortedIssues, sortedPrs, sortedCandidates);
+	const actionInbox = inbox.map((item, index) => `${index + 1}. ${item}`).join('\n\n') || 'No urgent actions today.';
+	const candidates = sortedCandidates
+		.map(
+			(pr, index) =>
+				`### ${index + 1}. [${pr.repo}](https://github.com/${pr.repo}): ${pr.title}\n\n- Fingerprint: \`${pr.fingerprint}\`\n- Risk: ${pr.risk}\n- Why it matters: ${pr.reason}\n- Suggested action: ${candidateAction(pr)}\n- Verification: ${pr.verification}\n`,
+		)
+		.join('\n') || 'No draft PR candidates.';
 	const created = report.createdDraftPrs.map((pr) => `- ${pr.status}: ${pr.repo}${pr.url ? ` — ${pr.url}` : ''}${pr.reason ? ` — ${pr.reason}` : ''}`).join('\n') || '- No draft PRs created.';
-	const bestPractices = report.bestPractices.map((item) => `- ${item}`).join('\n') || '- No best-practice findings.';
-	const efficiency = report.efficiency.map((item) => `- ${item}`).join('\n') || '- No efficiency findings.';
-	const codeQuality = report.codeQuality.map((item) => `- ${item}`).join('\n') || '- No code-quality findings.';
+	const prMd = sortedPrs.map((item) => workItemLine(item, 'PR')).join('\n') || '- No open PRs found.';
+	const issueMd = sortedIssues.map((item) => workItemLine(item, 'issue')).join('\n') || '- No open issues found.';
+	const bestPractices = report.bestPractices.map((item) => `- ${linkRepoInText(item)}`).join('\n') || '- No best-practice findings.';
+	const efficiency = report.efficiency.map((item) => `- ${linkRepoInText(item)}`).join('\n') || '- No efficiency findings.';
+	const codeQuality = report.codeQuality.map((item) => `- ${linkRepoInText(item)}`).join('\n') || '- No code-quality findings.';
 	const lessons = report.sharedLessons.map((lesson) => `- ${lesson}`).join('\n') || '- No shared lessons.';
-	return `# MaintainerBot Daily Report\n\nGenerated: ${report.generatedAt}\n\n## Summary\n\n${report.summary}\n\n- Owner: ${report.owner}\n- Mode: ${report.mode}\n- Repositories scanned: ${report.repoCount}\n\n## Priority actions\n\n${actions}\n\n## Open issues\n\n${issueMd}\n\n## Open pull requests\n\n${prMd}\n\n## Best practices\n\n${bestPractices}\n\n## Efficiency\n\n${efficiency}\n\n## Code quality\n\n${codeQuality}\n\n## Draft PR candidates\n\n${recs}\n\n## Draft PR creation results\n\n${created}\n\n## Shared lessons\n\n${lessons}\n`;
+	return `# MaintainerBot Status\n\nLast updated: ${report.generatedAt}\n\n## Action inbox\n\n${actionInbox}\n\n## Draft PR candidates\n\nDraft PR creation is ${report.createdDraftPrs.length ? 'active for this run' : 'disabled or produced no PRs'}.\n\n${candidates}\n\n## Open PRs needing review\n\n${prMd}\n\n## Open issues needing triage\n\n${issueMd}\n\n## Repo health fixes\n\n### Best practices\n\n${bestPractices}\n\n### Efficiency\n\n${efficiency}\n\n### Code quality\n\n${codeQuality}\n\n## Summary\n\n${report.summary}\n\n- Owner: ${report.owner}\n- Mode: ${report.mode}\n- Repositories scanned: ${report.repoCount}\n- Open issues: ${report.issues.length}\n- Open PRs: ${report.pullRequests.length}\n\n## Draft PR creation results\n\n${created}\n\n## Shared lessons\n\n${lessons}\n`;
+}
+
+function buildActionInbox(issues: WorkItem[], prs: WorkItem[], candidates: Recommendation[]) {
+	const items: string[] = [];
+	for (const issue of issues.slice(0, 4)) {
+		items.push(`${priority(issue)} Triage issue [${issue.repo}#${issue.number}](${issue.url})\n   - Why: ${issueReason(issue)}\n   - Suggested action: ${issueAction(issue)}`);
+	}
+	for (const pr of prs.slice(0, 6)) {
+		items.push(`${priority(pr)} Review PR [${pr.repo}#${pr.number}](${pr.url})\n   - Why: ${prReason(pr)}\n   - Suggested action: review, merge, request changes, or close`);
+	}
+	for (const candidate of candidates.slice(0, 5)) {
+		items.push(`[P3] Candidate fix [${candidate.repo}](https://github.com/${candidate.repo}) — ${candidate.title}\n   - Why: ${candidate.reason}\n   - Suggested action: ${candidateAction(candidate)}`);
+	}
+	return items.slice(0, 12);
+}
+
+function compareWorkItems(a: WorkItem, b: WorkItem) {
+	return priorityRank(priority(a)) - priorityRank(priority(b)) || Date.parse(b.updatedAt) - Date.parse(a.updatedAt);
+}
+
+function compareRecommendations(a: Recommendation, b: Recommendation) {
+	const risk = { high: 0, medium: 1, low: 2 };
+	return risk[a.risk] - risk[b.risk] || a.repo.localeCompare(b.repo);
+}
+
+function priorityRank(value: string) {
+	return value === '[P0]' ? 0 : value === '[P1]' ? 1 : value === '[P2]' ? 2 : 3;
+}
+
+function workItemLine(item: WorkItem, kind: 'issue' | 'PR') {
+	const labels = item.labels.join(', ') || 'none';
+	const why = kind === 'PR' ? prReason(item) : issueReason(item);
+	const action = kind === 'PR' ? 'review, merge, request changes, or close' : issueAction(item);
+	return `- ${priority(item)} [${item.repo}#${item.number}](${item.url}) — ${item.title}\n  - Why: ${why}\n  - Suggested action: ${action}\n  - Metadata: ${item.ageDays}d old, ${item.comments} comments, labels: ${labels}`;
+}
+
+function issueReason(item: WorkItem) {
+	if (/p0|critical|security|credential/i.test(item.title)) return 'security/credential-related language suggests higher risk.';
+	if (item.stale) return 'stale open issue needs a decision.';
+	return 'open issue needs triage or a maintainer response.';
+}
+
+function issueAction(item: WorkItem) {
+	if (/p0|critical|security|credential/i.test(item.title)) return 'label security/priority, confirm scope, and decide owner.';
+	return 'label, confirm expected behavior, assign next action, or close.';
+}
+
+function prReason(item: WorkItem) {
+	if (item.stale || item.ageDays > 60) return `open for ${item.ageDays} days and likely needs a merge/close decision.`;
+	return 'open PR is awaiting maintainer review.';
+}
+
+function candidateAction(item: Recommendation) {
+	return item.risk === 'low' ? 'approve for draft PR creation or apply manually.' : 'review manually before enabling draft PR creation.';
+}
+
+function linkRepoInText(value: string) {
+	return value.replace(/(adewale\/[A-Za-z0-9_.-]+)/g, '[$1](https://github.com/$1)');
 }
 
 function buildDeterministicReport(repos: RepoSummary[], issues: WorkItem[], pullRequests: WorkItem[], rejected: Set<string>) {

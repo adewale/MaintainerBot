@@ -259,16 +259,14 @@ The daily report should eventually include:
 - Verification evidence
 - Rejected/repeated ideas filtered out
 
-Current report sections:
+Current report sections are arranged so the most actionable items come first:
 
-- Summary
-- Priority actions with P0/P1/P2/P3 priority prefixes
-- Open issues with links, age, labels, comments, and author
-- Open pull requests with links, age, labels, comments, and author
-- Best-practice findings
-- Efficiency findings
-- Code-quality findings
-- Draft PR candidates with stable fingerprints
+- Action inbox: ranked, clickable actions with why/action guidance
+- Draft PR candidates with stable fingerprints and suggested action
+- Open PRs needing review with links, priority, rationale, and action
+- Open issues needing triage with links, priority, rationale, and action
+- Repo health fixes grouped by best practices, efficiency, and code quality
+- Summary and run metadata
 - Draft PR creation results
 - Shared lessons
 
