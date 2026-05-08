@@ -54,6 +54,18 @@ reports/history/YYYY-MM-DD/daily-maintenance.md
 reports/history/YYYY-MM-DD/daily-maintenance.json
 ```
 
+Public living status page:
+
+```txt
+https://pub-39149b57d8394ddea78c0ca9f90e087f.r2.dev/MaintainerBotOut.md
+```
+
+Public latest JSON:
+
+```txt
+https://pub-39149b57d8394ddea78c0ca9f90e087f.r2.dev/MaintainerBotOut.json
+```
+
 Download the living status page:
 
 ```bash

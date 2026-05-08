@@ -41,6 +41,12 @@ reports/history/YYYY-MM-DD/daily-maintenance.json
 
 Primary product interface: `MaintainerBotOut.md` in R2. Every run overwrites this object with the latest effective status of all scanned projects. Historic reports remain immutable-ish dated snapshots under `reports/history/`.
 
+The R2 dev URL is public:
+
+```txt
+https://pub-39149b57d8394ddea78c0ca9f90e087f.r2.dev/MaintainerBotOut.md
+```
+
 Local debug/history artifacts may also be written under:
 
 ```txt

@@ -67,6 +67,18 @@ reports/history/YYYY-MM-DD/daily-maintenance.json
 
 The preferred interface is now the living R2 status file, `MaintainerBotOut.md`. Each run overwrites it with the effective current status of all scanned projects while still preserving dated history under `reports/history/`.
 
+Public latest status URL:
+
+```txt
+https://pub-39149b57d8394ddea78c0ca9f90e087f.r2.dev/MaintainerBotOut.md
+```
+
+Public latest JSON URL:
+
+```txt
+https://pub-39149b57d8394ddea78c0ca9f90e087f.r2.dev/MaintainerBotOut.json
+```
+
 Local copies under `reports/` are for local debugging/history only.
 
 ## Setup
