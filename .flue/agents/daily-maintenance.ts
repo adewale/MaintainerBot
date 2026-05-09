@@ -14,6 +14,26 @@ type RepoHealth = {
 	packageManager: string | null;
 };
 
+type ProjectContext = {
+	repo: string;
+	url: string;
+	description: string | null;
+	language: string | null;
+	lastPushed: string | null;
+	health: RepoHealth;
+	openTodos: string[];
+	openIssues: WorkItem[];
+	openPullRequests: WorkItem[];
+	deterministicFindings: Recommendation[];
+};
+
+type ProjectRecommendation = Recommendation & {
+	priority: 'P0' | 'P1' | 'P2' | 'P3';
+	category: 'triage' | 'review' | 'docs' | 'ci' | 'tests' | 'cleanup' | 'investigation';
+	evidence: string[];
+	recommendedAction: string;
+};
+
 type RepoSummary = {
 	name: string;
 	fullName: string;
@@ -25,6 +45,7 @@ type RepoSummary = {
 	language: string | null;
 	defaultBranch: string;
 	health: RepoHealth;
+	openTodos: string[];
 };
 
 type WorkItem = {
@@ -75,6 +96,7 @@ type MaintenanceReport = {
 	bestPractices: string[];
 	efficiency: string[];
 	codeQuality: string[];
+	projectRecommendations: ProjectRecommendation[];
 	sharedLessons: string[];
 	generatedAt: string;
 	r2?: { bucket: string; keys: string[] };
@@ -101,6 +123,20 @@ const ReportSchema = v.object({
 			fingerprint: v.string(),
 			repo: v.string(),
 			title: v.string(),
+			reason: v.string(),
+			verification: v.string(),
+			risk: v.picklist(['low', 'medium', 'high']),
+		}),
+	),
+	projectRecommendations: v.array(
+		v.object({
+			fingerprint: v.string(),
+			repo: v.string(),
+			priority: v.picklist(['P0', 'P1', 'P2', 'P3']),
+			category: v.picklist(['triage', 'review', 'docs', 'ci', 'tests', 'cleanup', 'investigation']),
+			title: v.string(),
+			evidence: v.array(v.string()),
+			recommendedAction: v.string(),
 			reason: v.string(),
 			verification: v.string(),
 			risk: v.picklist(['low', 'medium', 'high']),
@@ -160,6 +196,7 @@ export default async function ({ init, env, payload }: FlueContext) {
 
 	const generatedAt = new Date().toISOString();
 	const deterministic = buildDeterministicReport(repos, issues, pullRequests, rejected);
+	const projectContexts = buildProjectContexts(repos, issues, pullRequests, deterministic.recommendations, rejected);
 
 	let report: MaintenanceReport;
 	if (!hasModel) {
@@ -170,20 +207,22 @@ export default async function ({ init, env, payload }: FlueContext) {
 
 Owner: ${owner}
 Repositories scanned: ${repos.length}
-Open issues JSON:
-${JSON.stringify(issues.slice(0, 50), null, 2)}
-Open PRs JSON:
-${JSON.stringify(pullRequests.slice(0, 50), null, 2)}
-Repository summaries JSON:
-${JSON.stringify(repos.slice(0, 50), null, 2)}
+Project contexts JSON (includes repo health, open issues, open PRs, deterministic findings, and open TODOs from each project):
+${JSON.stringify(projectContexts, null, 2)}
+
 Rejected fingerprints:
 ${JSON.stringify([...rejected], null, 2)}
+
 Lessons ledger:
 ${lessons}
 
-Focus on issues, PRs, best practices, lessons learned, efficiency, code quality, and shared lessons. Every candidate must have a stable fingerprint and verification step. Do not include rejected fingerprints.`,
+Use only the supplied JSON. Do not invent repositories, issues, PRs, files, or TODOs.
+For each project with meaningful activity, open TODOs, or maintenance gaps, emit recommendations.
+Every recommendation must cite evidence, include a stable fingerprint, and avoid rejected fingerprints.
+Prefer small, reviewable actions. Do not claim draft PRs were created.`,
 			{ role: 'maintainer', result: ReportSchema },
 		);
+		const llmProjectRecommendations = llmReport.projectRecommendations.filter((candidate) => !rejected.has(candidate.fingerprint));
 		const candidates = llmReport.draftPrCandidates.filter((candidate) => !rejected.has(candidate.fingerprint));
 		report = {
 			ok: true,
@@ -196,6 +235,7 @@ Focus on issues, PRs, best practices, lessons learned, efficiency, code quality,
 			issues: issues.slice(0, 30),
 			pullRequests: pullRequests.slice(0, 30),
 			recommendations: candidates,
+			projectRecommendations: llmProjectRecommendations,
 			draftPrCandidates: candidates,
 			createdDraftPrs: [],
 			bestPractices: deterministic.bestPractices,
@@ -232,7 +272,26 @@ async function fetchRepos(owner: string, headers: Record<string, string>): Promi
 			language: repo.language,
 			defaultBranch: repo.default_branch ?? 'main',
 		}));
-	return await Promise.all(baseRepos.map(async (repo) => ({ ...repo, health: await fetchRepoHealth(repo.fullName, headers) })));
+	return await Promise.all(baseRepos.map(async (repo) => ({ ...repo, health: await fetchRepoHealth(repo.fullName, headers), openTodos: await fetchOpenTodos(repo.fullName, headers) })));
+}
+
+async function fetchOpenTodos(fullName: string, headers: Record<string, string>): Promise<string[]> {
+	const candidates = ['TODO.md', 'TODOS.md', 'todo.md', 'todo.txt'];
+	for (const path of candidates) {
+		const file = await ghOptional(`https://api.github.com/repos/${fullName}/contents/${path}`, headers);
+		if (file?.content) {
+			try {
+				return atob(String(file.content).replace(/\n/g, ''))
+					.split(/\r?\n/)
+					.map((line) => line.trim())
+					.filter((line) => /^[-*]?\s*\[?\s*\]?\s*(TODO|todo|[/-])/.test(line) || line.startsWith('- [ ]'))
+					.slice(0, 20);
+			} catch {
+				return [];
+			}
+		}
+	}
+	return [];
 }
 
 async function fetchRepoHealth(fullName: string, headers: Record<string, string>): Promise<RepoHealth> {
@@ -299,6 +358,27 @@ function rejectedFingerprints(rejectionsJson: string) {
 	} catch {
 		return new Set<string>();
 	}
+}
+
+function buildProjectContexts(
+	repos: RepoSummary[],
+	issues: WorkItem[],
+	pullRequests: WorkItem[],
+	recommendations: Recommendation[],
+	rejected: Set<string>,
+): ProjectContext[] {
+	return repos.map((repo) => ({
+		repo: repo.fullName,
+		url: repo.url,
+		description: repo.description,
+		language: repo.language,
+		lastPushed: repo.pushedAt,
+		health: repo.health,
+		openTodos: repo.openTodos,
+		openIssues: issues.filter((issue) => issue.repo === repo.fullName),
+		openPullRequests: pullRequests.filter((pr) => pr.repo === repo.fullName),
+		deterministicFindings: recommendations.filter((item) => item.repo === repo.fullName && !rejected.has(item.fingerprint)),
+	}));
 }
 
 async function writeReportToR2(bucket: R2BucketLike, report: MaintenanceReport) {
@@ -451,6 +531,21 @@ function buildDeterministicReport(repos: RepoSummary[], issues: WorkItem[], pull
 
 function recommendation(repo: string, kind: string, title: string, reason: string, verification: string, risk: 'low' | 'medium' | 'high'): Recommendation {
 	return { fingerprint: `${repo}:${kind}:${slug(title)}`, repo, title, reason, verification, risk };
+}
+
+function priorityForRecommendation(item: Recommendation): 'P0' | 'P1' | 'P2' | 'P3' {
+	if (/security|credential|p0|critical/i.test(`${item.title} ${item.reason}`)) return 'P0';
+	if (item.risk === 'high') return 'P1';
+	if (item.risk === 'medium') return 'P2';
+	return 'P3';
+}
+
+function categoryForRecommendation(item: Recommendation): ProjectRecommendation['category'] {
+	if (/ci|workflow|actions/i.test(item.title)) return 'ci';
+	if (/test|check/i.test(item.title)) return 'tests';
+	if (/readme|description|documentation|docs/i.test(item.title)) return 'docs';
+	if (/stale|archive|refresh/i.test(item.title)) return 'cleanup';
+	return 'investigation';
 }
 
 function priority(item: WorkItem) {

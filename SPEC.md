@@ -243,6 +243,34 @@ Operational rules:
 - Rotate the webhook secret if it is exposed in logs, screenshots, shell history, or chat.
 - Prefer a dedicated random secret, not a reused password or API token.
 
+## LLM project-context handoff
+
+When model credentials are configured, MaintainerBot hands the LLM a structured, deterministic project context object for each recently active repository. This keeps GitHub/API scanning as the source of truth while letting the LLM improve prioritization and recommendations.
+
+Each project context includes:
+
+- repo name and URL
+- description, language, and last pushed date
+- repo health signals: README, license, CI, package.json, test/check scripts, lockfile, package manager
+- open TODOs discovered from root `TODO.md`, `TODOS.md`, `todo.md`, or `todo.txt`
+- open issues for that repo
+- open PRs for that repo
+- deterministic findings for that repo
+- rejected fingerprints to avoid
+- shared lessons ledger
+
+The LLM must:
+
+- use only supplied JSON
+- not invent repos, issues, PRs, files, or TODOs
+- emit stable fingerprints
+- cite evidence
+- avoid rejected fingerprints
+- prefer small, reviewable actions
+- never claim draft PRs were created
+
+Secrets are not included in this project context.
+
 ## Report contract
 
 The daily report should eventually include:
