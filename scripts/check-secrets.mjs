@@ -4,7 +4,7 @@ import { join, relative } from 'node:path';
 
 const root = process.cwd();
 const ignoredDirs = new Set(['node_modules', '.git', 'dist']);
-const ignoredFiles = new Set(['pnpm-lock.yaml']);
+const ignoredFiles = new Set(['pnpm-lock.yaml', 'results.sarif']);
 
 const patterns = [
   { name: 'Anthropic API key', re: /sk-ant-[A-Za-z0-9_-]{20,}/g },
@@ -30,7 +30,7 @@ async function walk(dir, files = []) {
     const path = join(dir, entry);
     const s = await stat(path);
     if (s.isDirectory()) await walk(path, files);
-    else if (!ignoredFiles.has(entry)) files.push(path);
+    else if (!ignoredFiles.has(entry) && !entry.endsWith('.sarif')) files.push(path);
   }
   return files;
 }
