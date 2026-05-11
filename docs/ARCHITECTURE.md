@@ -49,7 +49,15 @@ The agent uses a lightweight `just-bash` sandbox for local scratch files. GitHub
 
 ## LLM context
 
-When model credentials exist, the agent passes structured project contexts to the LLM. Each context includes repository metadata, health signals, open TODOs from root TODO files, open issues, open PRs, and deterministic findings. Secrets are not included.
+When model credentials exist, the agent computes an audit input hash for each project and only sends changed projects to the LLM. Each context includes repository metadata, health signals, open TODOs from root TODO files, open issues, open PRs, and deterministic findings. Secrets are not included.
+
+LLM audit history is stored in R2:
+
+```txt
+audits/index.json
+audits/projects/<owner>__<repo>/latest.json
+audits/projects/<owner>__<repo>/history/<timestamp>.json
+```
 
 ## Model routing
 

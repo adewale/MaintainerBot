@@ -12,7 +12,7 @@ As the project evolves, update both this README and `SPEC.md` with the current p
 
 ## Current intent
 
-MaintainerBot should help me maintain my various open-source projects by scanning recently active projects every day and producing a useful maintenance report. By default, it only includes repositories updated in the last year.
+MaintainerBot should help me maintain my various open-source projects by scanning recently active projects every day and producing a useful maintenance report. It only includes repositories updated since November 17, 2025.
 
 Every day it should look at:
 

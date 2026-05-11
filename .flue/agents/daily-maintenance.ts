@@ -73,6 +73,23 @@ type Recommendation = {
 	rejected?: boolean;
 };
 
+type ProjectAudit = {
+	repo: string;
+	auditedAt: string;
+	inputHash: string;
+	status: 'healthy' | 'needs_attention' | 'stale' | 'blocked';
+	summary: string;
+	recommendations: ProjectRecommendation[];
+	sharedLessons: string[];
+};
+
+type AuditRunSummary = {
+	audited: string[];
+	carriedForward: string[];
+	skipped: string[];
+	results: ProjectAudit[];
+};
+
 type CreatedDraftPr = {
 	repo: string;
 	url?: string;
@@ -97,6 +114,7 @@ type MaintenanceReport = {
 	efficiency: string[];
 	codeQuality: string[];
 	projectRecommendations: ProjectRecommendation[];
+	llmAudits: AuditRunSummary;
 	sharedLessons: string[];
 	generatedAt: string;
 	r2?: { bucket: string; keys: string[] };
@@ -114,6 +132,26 @@ const DEFAULT_LESSONS = `# MaintainerBot Lessons Ledger
 - Add tests or verification notes with every fix.
 - Avoid repeating rejected changes from data/rejections.json.
 `;
+
+const ProjectAuditSchema = v.object({
+	status: v.picklist(['healthy', 'needs_attention', 'stale', 'blocked']),
+	summary: v.string(),
+	recommendations: v.array(
+		v.object({
+			fingerprint: v.string(),
+			repo: v.string(),
+			priority: v.picklist(['P0', 'P1', 'P2', 'P3']),
+			category: v.picklist(['triage', 'review', 'docs', 'ci', 'tests', 'cleanup', 'investigation']),
+			title: v.string(),
+			evidence: v.array(v.string()),
+			recommendedAction: v.string(),
+			reason: v.string(),
+			verification: v.string(),
+			risk: v.picklist(['low', 'medium', 'high']),
+		}),
+	),
+	sharedLessons: v.array(v.string()),
+});
 
 const ReportSchema = v.object({
 	summary: v.string(),
@@ -187,7 +225,7 @@ export default async function ({ init, env, payload }: FlueContext) {
 	await session.shell(`cat > /workspace/data/rejections.json <<'EOF'\n${rejections}\nEOF`);
 	await session.shell(`cat > /workspace/data/lessons.md <<'EOF'\n${lessons}\nEOF`);
 
-	const cutoff = new Date(Date.now() - 365 * 24 * 60 * 60 * 1000).toISOString();
+	const cutoff = '2025-11-17T00:00:00.000Z';
 	const repos = (await fetchRepos(owner, githubHeaders)).filter((repo) => repo.pushedAt && repo.pushedAt >= cutoff);
 	await session.shell(`cat > /workspace/reports/repo-summary.json <<'EOF'\n${JSON.stringify(repos, null, 2)}\nEOF`);
 	const repoNames = new Set(repos.map((repo) => repo.fullName));
@@ -198,52 +236,30 @@ export default async function ({ init, env, payload }: FlueContext) {
 	const deterministic = buildDeterministicReport(repos, issues, pullRequests, rejected);
 	const projectContexts = buildProjectContexts(repos, issues, pullRequests, deterministic.recommendations, rejected);
 
-	let report: MaintenanceReport;
-	if (!hasModel) {
-		report = { ok: true, mode: 'deterministic-no-model', owner, repoCount: repos.length, generatedAt, ...deterministic };
-	} else {
-		const llmReport = await session.prompt(
-			`Create today's MaintainerBot maintenance report.
+	const llmAudits = await auditChangedProjects({
+		hasModel,
+		bucket: reportsBucket,
+		session,
+		projectContexts,
+		rejected,
+		lessons,
+		generatedAt,
+	});
+	const auditRecommendations = llmAudits.results.flatMap((audit) => audit.recommendations).filter((item) => !rejected.has(item.fingerprint));
+	const mergedRecommendations = [...auditRecommendations, ...deterministic.recommendations];
 
-Owner: ${owner}
-Repositories scanned: ${repos.length}
-Project contexts JSON (includes repo health, open issues, open PRs, deterministic findings, and open TODOs from each project):
-${JSON.stringify(projectContexts, null, 2)}
-
-Rejected fingerprints:
-${JSON.stringify([...rejected], null, 2)}
-
-Lessons ledger:
-${lessons}
-
-Use only the supplied JSON. Do not invent repositories, issues, PRs, files, or TODOs.
-For each project with meaningful activity, open TODOs, or maintenance gaps, emit recommendations.
-Every recommendation must cite evidence, include a stable fingerprint, and avoid rejected fingerprints.
-Prefer small, reviewable actions. Do not claim draft PRs were created.`,
-			{ role: 'maintainer', result: ReportSchema },
-		);
-		const llmProjectRecommendations = llmReport.projectRecommendations.filter((candidate) => !rejected.has(candidate.fingerprint));
-		const candidates = llmReport.draftPrCandidates.filter((candidate) => !rejected.has(candidate.fingerprint));
-		report = {
-			ok: true,
-			mode: 'llm-assisted',
-			owner,
-			repoCount: repos.length,
-			generatedAt,
-			summary: llmReport.summary,
-			priorityActions: llmReport.priorityActions,
-			issues: issues.slice(0, 30),
-			pullRequests: pullRequests.slice(0, 30),
-			recommendations: candidates,
-			projectRecommendations: llmProjectRecommendations,
-			draftPrCandidates: candidates,
-			createdDraftPrs: [],
-			bestPractices: deterministic.bestPractices,
-			efficiency: deterministic.efficiency,
-			codeQuality: deterministic.codeQuality,
-			sharedLessons: llmReport.sharedLessons,
-		};
-	}
+	const report: MaintenanceReport = {
+		ok: true,
+		mode: hasModel ? 'llm-assisted' : 'deterministic-no-model',
+		owner,
+		repoCount: repos.length,
+		generatedAt,
+		...deterministic,
+		recommendations: mergedRecommendations,
+		projectRecommendations: auditRecommendations,
+		draftPrCandidates: mergedRecommendations.filter((item) => item.risk === 'low').slice(0, 8),
+		llmAudits,
+	};
 
 	report.createdDraftPrs = await maybeCreateDraftPrs(report, repos, env, githubHeaders, reportsBucket);
 	await maybeSendEmail(report, env);
@@ -381,6 +397,126 @@ function buildProjectContexts(
 	}));
 }
 
+async function auditChangedProjects(options: {
+	hasModel: boolean;
+	bucket: R2BucketLike | undefined;
+	session: any;
+	projectContexts: ProjectContext[];
+	rejected: Set<string>;
+	lessons: string;
+	generatedAt: string;
+}): Promise<AuditRunSummary> {
+	if (!options.hasModel || !options.bucket) {
+		return {
+			audited: [],
+			carriedForward: [],
+			skipped: options.projectContexts.map((project) => project.repo),
+			results: [],
+		};
+	}
+
+	const results: ProjectAudit[] = [];
+	const audited: string[] = [];
+	const carriedForward: string[] = [];
+	const skipped: string[] = [];
+	const lessonsHash = await sha256(options.lessons);
+
+	for (const project of options.projectContexts) {
+		const auditInput = {
+			repo: project.repo,
+			lastPushed: project.lastPushed,
+			health: project.health,
+			openTodos: project.openTodos,
+			issues: project.openIssues.map((issue) => ({ number: issue.number, title: issue.title, updatedAt: issue.updatedAt, labels: issue.labels })),
+			pullRequests: project.openPullRequests.map((pr) => ({ number: pr.number, title: pr.title, updatedAt: pr.updatedAt, labels: pr.labels })),
+			findings: project.deterministicFindings.map((finding) => finding.fingerprint),
+			lessonsHash,
+		};
+		const inputHash = await sha256(stableJson(auditInput));
+		const keyPrefix = `audits/projects/${project.repo.replace('/', '__')}`;
+		const latestKey = `${keyPrefix}/latest.json`;
+		const latest = await options.bucket.get(latestKey);
+		if (latest) {
+			const existing = JSON.parse(await latest.text()) as ProjectAudit;
+			if (existing.inputHash === inputHash) {
+				carriedForward.push(project.repo);
+				results.push(existing);
+				continue;
+			}
+		}
+
+		const audit = await options.session.prompt(
+			`You are MaintainerBot auditing one repository.
+
+Use only the supplied project context. Do not invent files, issues, PRs, or TODOs.
+Emit a concise audit with prioritized recommendations. Avoid rejected fingerprints.
+Prefer small, reviewable actions. Do not claim draft PRs were created.
+
+Project context JSON:
+${JSON.stringify(project, null, 2)}
+
+Rejected fingerprints:
+${JSON.stringify([...options.rejected], null, 2)}
+
+Shared lessons:
+${options.lessons}`,
+			{ role: 'maintainer', result: ProjectAuditSchema },
+		);
+		const normalized: ProjectAudit = {
+			repo: project.repo,
+			auditedAt: options.generatedAt,
+			inputHash,
+			status: audit.status,
+			summary: audit.summary,
+			recommendations: audit.recommendations.filter((item) => !options.rejected.has(item.fingerprint)),
+			sharedLessons: audit.sharedLessons,
+		};
+		const historyKey = `${keyPrefix}/history/${options.generatedAt.replace(/[:.]/g, '-')}.json`;
+		await options.bucket.put(latestKey, `${JSON.stringify(normalized, null, 2)}\n`, { httpMetadata: { contentType: 'application/json' } });
+		await options.bucket.put(historyKey, `${JSON.stringify(normalized, null, 2)}\n`, { httpMetadata: { contentType: 'application/json' } });
+		audited.push(project.repo);
+		results.push(normalized);
+	}
+
+	if (options.bucket) {
+		const index = {
+			lastRunAt: options.generatedAt,
+			audited,
+			carriedForward,
+			skipped,
+			projects: Object.fromEntries(results.map((audit) => [audit.repo, {
+				latestAuditKey: `audits/projects/${audit.repo.replace('/', '__')}/latest.json`,
+				lastInputHash: audit.inputHash,
+				lastAuditedAt: audit.auditedAt,
+				status: audit.status,
+			}])),
+		};
+		await options.bucket.put('audits/index.json', `${JSON.stringify(index, null, 2)}\n`, { httpMetadata: { contentType: 'application/json' } });
+	}
+
+	return { audited, carriedForward, skipped, results };
+}
+
+async function sha256(value: string) {
+	const bytes = new TextEncoder().encode(value);
+	const hash = await crypto.subtle.digest('SHA-256', bytes);
+	return [...new Uint8Array(hash)].map((b) => b.toString(16).padStart(2, '0')).join('');
+}
+
+function stableJson(value: unknown) {
+	return JSON.stringify(value, Object.keys(flattenKeys(value)).sort());
+}
+
+function flattenKeys(value: any, keys: Record<string, true> = {}) {
+	if (value && typeof value === 'object') {
+		for (const key of Object.keys(value)) {
+			keys[key] = true;
+			flattenKeys(value[key], keys);
+		}
+	}
+	return keys;
+}
+
 async function writeReportToR2(bucket: R2BucketLike, report: MaintenanceReport) {
 	const day = report.generatedAt.slice(0, 10);
 	const markdown = renderMarkdown(report);
@@ -408,6 +544,7 @@ function renderMarkdown(report: MaintenanceReport) {
 	const sortedCandidates = [...report.draftPrCandidates].sort(compareRecommendations);
 	const inbox = buildActionInbox(sortedIssues, sortedPrs, sortedCandidates);
 	const actionInbox = inbox.map((item, index) => `${index + 1}. ${item}`).join('\n\n') || 'No urgent actions today.';
+	const auditSummary = renderAuditSummary(report.llmAudits);
 	const candidates = sortedCandidates
 		.map(
 			(pr, index) =>
@@ -421,7 +558,14 @@ function renderMarkdown(report: MaintenanceReport) {
 	const efficiency = report.efficiency.map((item) => `- ${linkRepoInText(item)}`).join('\n') || '- No efficiency findings.';
 	const codeQuality = report.codeQuality.map((item) => `- ${linkRepoInText(item)}`).join('\n') || '- No code-quality findings.';
 	const lessons = report.sharedLessons.map((lesson) => `- ${lesson}`).join('\n') || '- No shared lessons.';
-	return `# MaintainerBot Status\n\nLast updated: ${report.generatedAt}\n\n## Action inbox\n\n${actionInbox}\n\n## Draft PR candidates\n\nDraft PR creation is ${report.createdDraftPrs.length ? 'active for this run' : 'disabled or produced no PRs'}.\n\n${candidates}\n\n## Open PRs needing review\n\n${prMd}\n\n## Open issues needing triage\n\n${issueMd}\n\n## Repo health fixes\n\n### Best practices\n\n${bestPractices}\n\n### Efficiency\n\n${efficiency}\n\n### Code quality\n\n${codeQuality}\n\n## Summary\n\n${report.summary}\n\n- Owner: ${report.owner}\n- Mode: ${report.mode}\n- Repositories scanned: ${report.repoCount}\n- Open issues: ${report.issues.length}\n- Open PRs: ${report.pullRequests.length}\n\n## Draft PR creation results\n\n${created}\n\n## Shared lessons\n\n${lessons}\n`;
+	return `# MaintainerBot Status\n\nLast updated: ${report.generatedAt}\n\n## Action inbox\n\n${actionInbox}\n\n## LLM audit status\n\n${auditSummary}\n\n## Draft PR candidates\n\nDraft PR creation is ${report.createdDraftPrs.length ? 'active for this run' : 'disabled or produced no PRs'}.\n\n${candidates}\n\n## Open PRs needing review\n\n${prMd}\n\n## Open issues needing triage\n\n${issueMd}\n\n## Repo health fixes\n\n### Best practices\n\n${bestPractices}\n\n### Efficiency\n\n${efficiency}\n\n### Code quality\n\n${codeQuality}\n\n## Summary\n\n${report.summary}\n\n- Owner: ${report.owner}\n- Mode: ${report.mode}\n- Repositories scanned: ${report.repoCount}\n- Open issues: ${report.issues.length}\n- Open PRs: ${report.pullRequests.length}\n\n## Draft PR creation results\n\n${created}\n\n## Shared lessons\n\n${lessons}\n`;
+}
+
+function renderAuditSummary(audits: AuditRunSummary) {
+	const audited = audits.audited.length ? audits.audited.map((repo) => `- Audited: [${repo}](https://github.com/${repo})`).join('\n') : '- No projects needed a fresh LLM audit.';
+	const carried = audits.carriedForward.length ? audits.carriedForward.map((repo) => `- Carried forward: [${repo}](https://github.com/${repo})`).join('\n') : '- No carried-forward audits.';
+	const skipped = audits.skipped.length ? `- Skipped ${audits.skipped.length} project(s) because no model/R2 audit path was available.` : '- No projects skipped.';
+	return `${audited}\n${carried}\n${skipped}`;
 }
 
 function buildActionInbox(issues: WorkItem[], prs: WorkItem[], candidates: Recommendation[]) {
@@ -498,7 +642,7 @@ function buildDeterministicReport(repos: RepoSummary[], issues: WorkItem[], pull
 		...stale.map((repo) => recommendation(repo.fullName, 'stale-repo-review', 'Review stale repository status', 'Repository has not been pushed recently.', 'Confirm whether the repo should be archived, refreshed, or documented as complete.', 'low' as const)),
 	].filter((item) => !rejected.has(item.fingerprint));
 	return {
-		summary: `Scanned ${repos.length} public, non-fork, non-archived repositories updated in the last year. Found ${issues.length} open issues, ${pullRequests.length} open PRs, ${needsDescription.length} repos missing descriptions, ${missingReadme.length} missing READMEs, ${missingCi.length} package repos missing CI, and ${missingTests.length} package repos missing test/check scripts.`,
+		summary: `Scanned ${repos.length} public, non-fork, non-archived repositories updated since November 17, 2025. Found ${issues.length} open issues, ${pullRequests.length} open PRs, ${needsDescription.length} repos missing descriptions, ${missingReadme.length} missing READMEs, ${missingCi.length} package repos missing CI, and ${missingTests.length} package repos missing test/check scripts.`,
 		priorityActions: [
 			...issues.slice(0, 10).map((issue) => `${priority(issue)} Triage issue ${issue.repo}#${issue.number}: ${issue.title}`),
 			...pullRequests.slice(0, 10).map((pr) => `${priority(pr)} Review PR ${pr.repo}#${pr.number}: ${pr.title}`),

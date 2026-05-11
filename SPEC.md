@@ -6,7 +6,7 @@ This is the evergreen product and technical spec for MaintainerBot. Keep this fi
 
 MaintainerBot is a daily open-source maintenance assistant for Adewale's recently active projects.
 
-It should help maintain many repositories by scanning project activity and quality signals, recommending concrete next steps, learning from accepted/rejected suggestions, and eventually preparing safe draft PRs with verification evidence. By default, the scan includes only repositories updated in the last year.
+It should help maintain many repositories by scanning project activity and quality signals, recommending concrete next steps, learning from accepted/rejected suggestions, and eventually preparing safe draft PRs with verification evidence. The scan includes only repositories updated since November 17, 2025.
 
 ## Current status
 
@@ -245,7 +245,7 @@ Operational rules:
 
 ## LLM project-context handoff
 
-When model credentials are configured, MaintainerBot hands the LLM a structured, deterministic project context object for each recently active repository. This keeps GitHub/API scanning as the source of truth while letting the LLM improve prioritization and recommendations.
+When model credentials are configured, MaintainerBot performs daily LLM audits only for projects whose audit inputs changed since their previous LLM audit. It hands the LLM a structured, deterministic project context object for each changed repository. This keeps GitHub/API scanning as the source of truth while letting the LLM improve prioritization and recommendations without re-auditing unchanged projects.
 
 Each project context includes:
 
@@ -258,6 +258,16 @@ Each project context includes:
 - deterministic findings for that repo
 - rejected fingerprints to avoid
 - shared lessons ledger
+
+Audit inputs are hashed and compared against the previous audit stored in R2. The hash includes repo metadata, health signals, open TODOs, open issues/PRs, deterministic finding fingerprints, and the lessons ledger hash.
+
+Audit storage in R2:
+
+```txt
+audits/index.json
+audits/projects/<owner>__<repo>/latest.json
+audits/projects/<owner>__<repo>/history/<timestamp>.json
+```
 
 The LLM must:
 

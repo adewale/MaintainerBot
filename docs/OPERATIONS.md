@@ -48,6 +48,9 @@ MaintainerBotOut.json
 data/rejections.json
 data/lessons.md
 data/created-prs.json
+audits/index.json
+audits/projects/<owner>__<repo>/latest.json
+audits/projects/<owner>__<repo>/history/<timestamp>.json
 reports/daily-maintenance-latest.md
 reports/daily-maintenance-latest.json
 reports/history/YYYY-MM-DD/daily-maintenance.md

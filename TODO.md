@@ -76,6 +76,7 @@ Deferred work and future milestones.
 - [ ] Add remote sandbox option for real repo cloning and test runs.
 - [x] Add Cloudflare AI Gateway provider configuration.
 - [x] Add LLM-assisted summarization path; needs model credentials to activate.
+- [x] Add changed-project-only LLM audit ledger in R2.
 
 ## Secret hygiene
 
