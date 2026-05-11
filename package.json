@@ -10,6 +10,7 @@
     "deploy:cloudflare": "flue build --target cloudflare --output . && wrangler deploy --config dist/wrangler.jsonc",
     "deploy:status": "wrangler deploy --config wrangler.status.jsonc",
     "daily": "flue run daily-maintenance --target node --id daily --payload '{}' --env .env --output .",
+    "deep:verify": "flue run deep-verify --target node --env .env --output .",
     "save:daily": "node scripts/run-daily.mjs",
     "reject": "node scripts/reject.mjs",
     "test:rejections": "node scripts/test-rejections.mjs",

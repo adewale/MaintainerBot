@@ -14,9 +14,10 @@ The agent:
 4. Builds deterministic recommendations with stable fingerprints.
 5. Builds per-project context, including repo health, issues, PRs, deterministic findings, and root TODO files.
 6. Optionally uses an LLM for richer per-project recommendations from that context.
-6. Optionally creates gated draft PRs for allowlisted repos.
-7. Writes the living status page, latest aliases, and historic reports to R2.
-8. Optionally sends email via Cloudflare Email Routing.
+7. Writes the living status page, latest aliases, audit ledgers, and historic reports to R2.
+8. Optionally sends email via Cloudflare Email Routing, though email is not a current priority.
+
+The deployed daily agent is read-only with respect to GitHub: it reads metadata and writes only MaintainerBot-owned R2 objects.
 
 ## Storage
 
@@ -45,7 +46,9 @@ reports/history/YYYY-MM-DD/daily-maintenance.json
 
 ## Runtime
 
-The agent uses a lightweight `just-bash` sandbox for local scratch files. GitHub API calls happen from trusted runtime code with secrets in env, not from prompts.
+The daily agent uses a lightweight `just-bash` sandbox for local scratch files. GitHub API calls happen from trusted runtime code with secrets in env, not from prompts.
+
+CLI-only agents are used for heavyweight read-only workflows. `deep-verify` clones changed repos into temporary local sandboxes, runs safe allowlisted verification commands, and summarizes evidence without mutating GitHub.
 
 ## LLM context
 

@@ -1,42 +1,38 @@
 # MaintainerBot Roadmap
 
-MaintainerBot is intended to become a daily open-source maintenance assistant.
+MaintainerBot is a read-only daily maintenance handoff for Adewale's public open-source projects.
 
 ## Current scaffold
 
-- Discovers public repositories for `GITHUB_OWNER`.
-- Scans repository metadata through the GitHub REST API.
-- Reads a rejection ledger from `data/rejections.json`.
-- Reads shared lessons from `data/lessons.md`.
-- Produces JSON and Markdown daily reports.
-- Can run without an LLM; uses Claude Haiku when `ANTHROPIC_API_KEY` is configured.
+- Scans public, non-fork, non-archived repositories for `GITHUB_OWNER`.
+- Only considers repositories changed since November 17, 2025.
+- Reads open issues, open PRs, root TODO files, and repo health signals.
+- Stores reports, lessons, rejections, and LLM audit history in R2.
+- Publishes a living Markdown/HTML status page.
+- Runs changed-project-only LLM audits when model credentials are configured.
+- Never mutates GitHub.
 
 ## Next milestones
 
-1. **Issue and PR detail scanning**
-   - Fetch recent open issues and PRs per repository.
-   - Include labels, age, comments, and stale status.
+1. **Deep verification**
+   - Use the CLI-only `deep-verify` agent for selected changed projects.
+   - Clone repos into temporary sandboxes.
+   - Run safe tests/build/check commands.
+   - Feed evidence back into the living status page.
 
-2. **Repository quality checks**
-   - Clone selected repos into a sandbox.
-   - Check README, license, tests, CI, package scripts, linting, and dependency metadata.
+2. **CI log analysis**
+   - Fetch failed workflow/job logs through read-only GitHub APIs.
+   - Truncate noisy logs before prompting.
+   - Recommend likely next human action.
 
-3. **Draft PR creation**
-   - Add a strict allowlist and `CREATE_DRAFT_PRS=true` safety gate.
-   - Create branches and draft PRs only for low-risk changes.
-   - Record fingerprints for proposed/rejected changes.
+3. **Issue/PR-specific read-only audits**
+   - Re-audit only when issue/PR comments or checks changed.
+   - Summarize reproduction/verification ideas without commenting or labeling.
 
-4. **Verification**
-   - Run tests/build/lint when available.
-   - Include verification output in each PR body.
-
-5. **Email delivery**
-   - Send `reports/daily-maintenance.md` to `EMAIL_TO`.
-   - Include links to draft PRs.
-
-6. **Rejection memory**
-   - Add a command/workflow to append rejected PR ideas to `data/rejections.json`.
-   - Filter future suggestions by fingerprint and repo.
+4. **Better memory**
+   - Improve rejection fingerprints.
+   - Add per-project profiles.
+   - Track recurring cross-repo maintenance patterns.
 
 ## Daily run
 

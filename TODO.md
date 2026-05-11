@@ -4,11 +4,10 @@ Deferred work and future milestones.
 
 ## Reporting
 
-- [x] Keep dated daily report history in `reports/daily-maintenance-YYYY-MM-DD.*` locally and `reports/history/YYYY-MM-DD/*` in R2.
-- [x] Emit the primary latest local report to `/tmp/MaintainerBotOut.md`.
-- [x] Emit the primary latest Cloudflare/R2 living status page to `MaintainerBotOut.md`.
+- [x] Keep dated daily report history in R2.
+- [x] Emit the primary Cloudflare/R2 living status page to `MaintainerBotOut.md`.
 - [x] Improve the daily Markdown report format.
-- [x] Add sections for issues, PRs, draft PR creation results, and shared lessons.
+- [x] Add sections for issues, PRs, read-only audit status, and shared lessons.
 - [x] Add dedicated sections for best practices, lessons learned, efficiency, and code quality.
 - [x] Add severity/priority scoring.
 - [x] Add stable fingerprints for every deterministic recommendation.
@@ -22,23 +21,21 @@ Deferred work and future milestones.
 - [x] Detect stale issues and PRs.
 - [x] Detect repos missing README, LICENSE, CI, tests, or package scripts.
 - [x] Detect dependency/tooling health signals.
+- [x] Only consider repositories changed since November 17, 2025.
 
 ## Code quality and efficiency
 
-- [ ] Clone selected repositories into a remote sandbox for deep verification.
-- [ ] Run available tests/build/lint commands in a remote sandbox.
+- [x] Add CLI-only read-only `deep-verify` workflow scaffold.
+- [ ] Run `deep-verify` for selected projects and feed results into the status page.
+- [ ] Add read-only CI log fetching/summarization.
 - [x] Identify small code quality improvements from GitHub metadata/API checks.
 - [x] Identify efficiency/performance improvements from GitHub metadata/API checks.
-- [ ] Verify code fixes before recommending code-changing PRs.
 
-## Draft PR creation
+## Read-only safety
 
-- [x] Keep `CREATE_DRAFT_PRS=false` until reporting is reliable.
-- [x] Add a strict allowlist for repos where PR creation is allowed.
-- [x] Create branches for low-risk changes only when explicitly enabled.
-- [x] Open draft PRs with clear titles, summaries, and verification notes when explicitly enabled.
-- [x] Never create a PR matching a rejected fingerprint.
-- [x] Record every created PR in an R2 ledger.
+- [x] Make MaintainerBot read-only: no branches, commits, PRs, comments, labels, or repo mutations.
+- [x] Remove active draft PR creation path.
+- [ ] Audit configuration to ensure any GitHub token is read-only/least-privileged.
 
 ## Rejection memory
 
@@ -47,16 +44,8 @@ Deferred work and future milestones.
 - [x] Add fingerprint matching so rejected ideas are filtered before reporting.
 - [x] Add tests for rejection filtering.
 
-## Email delivery
-
-- [x] Choose email provider/API: Cloudflare Email Routing `send_email` Worker binding.
-- [x] Implement sending the rendered report to `EMAIL_TO` when Resend env vars are configured.
-- [x] Include draft PR links once PR creation exists.
-- [x] Add dry-run mode for email output.
-
 ## Scheduling
 
-- [x] Add local cron instructions.
 - [x] Add GitHub Actions scheduled workflow.
 - [ ] Consider Cloudflare scheduled Worker deployment later if GitHub Actions scheduling becomes insufficient.
 
@@ -64,7 +53,7 @@ Deferred work and future milestones.
 
 - [x] Add Cloudflare Worker build/deploy scripts.
 - [x] Create/bind R2 bucket `maintainerbot-data`.
-- [x] Store rejections, lessons, latest reports, and historic reports in R2.
+- [x] Store rejections, lessons, latest reports, audit history, and historic reports in R2.
 - [x] Deploy webhook agent to Cloudflare.
 - [x] Add a daily scheduler that invokes the Cloudflare webhook.
 - [x] Add shared-secret protection for the public webhook endpoint.
@@ -73,7 +62,7 @@ Deferred work and future milestones.
 ## Flue/runtime evolution
 
 - [x] Keep current local `just-bash` scan path simple.
-- [ ] Add remote sandbox option for real repo cloning and test runs.
+- [x] Add CLI-only read-only verifier for real repo cloning and test runs.
 - [x] Add Cloudflare AI Gateway provider configuration.
 - [x] Add LLM-assisted summarization path; needs model credentials to activate.
 - [x] Add changed-project-only LLM audit ledger in R2.
@@ -87,6 +76,6 @@ Deferred work and future milestones.
 
 ## Documentation
 
-- [x] Keep `README.md` updated as the evolving intent document.
-- [x] Move implementation details into `docs/` as the project grows.
+- [x] Add concise living spec in `docs/LIVING_SPEC.md`.
+- [x] Document CLI-only opportunities and Astro lessons.
 - [x] Document safety boundaries and secret handling.

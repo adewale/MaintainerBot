@@ -450,7 +450,7 @@ async function auditChangedProjects(options: {
 
 Use only the supplied project context. Do not invent files, issues, PRs, or TODOs.
 Emit a concise audit with prioritized recommendations. Avoid rejected fingerprints.
-Prefer small, reviewable actions. Do not claim draft PRs were created.
+Prefer small, reviewable actions. Do not claim GitHub state was changed.
 
 Project context JSON:
 ${JSON.stringify(project, null, 2)}
@@ -550,15 +550,15 @@ function renderMarkdown(report: MaintenanceReport) {
 			(pr, index) =>
 				`### ${index + 1}. [${pr.repo}](https://github.com/${pr.repo}): ${pr.title}\n\n- Fingerprint: \`${pr.fingerprint}\`\n- Risk: ${pr.risk}\n- Why it matters: ${pr.reason}\n- Suggested action: ${candidateAction(pr)}\n- Verification: ${pr.verification}\n`,
 		)
-		.join('\n') || 'No draft PR candidates.';
-	const created = report.createdDraftPrs.map((pr) => `- ${pr.status}: ${pr.repo}${pr.url ? ` — ${pr.url}` : ''}${pr.reason ? ` — ${pr.reason}` : ''}`).join('\n') || '- No draft PRs created.';
+		.join('\n') || 'No manual action candidates.';
+	const created = report.createdDraftPrs.map((pr) => `- ${pr.status}: ${pr.repo}${pr.url ? ` — ${pr.url}` : ''}${pr.reason ? ` — ${pr.reason}` : ''}`).join('\n') || '- Read-only mode: no GitHub mutations created.';
 	const prMd = sortedPrs.map((item) => workItemLine(item, 'PR')).join('\n') || '- No open PRs found.';
 	const issueMd = sortedIssues.map((item) => workItemLine(item, 'issue')).join('\n') || '- No open issues found.';
 	const bestPractices = report.bestPractices.map((item) => `- ${linkRepoInText(item)}`).join('\n') || '- No best-practice findings.';
 	const efficiency = report.efficiency.map((item) => `- ${linkRepoInText(item)}`).join('\n') || '- No efficiency findings.';
 	const codeQuality = report.codeQuality.map((item) => `- ${linkRepoInText(item)}`).join('\n') || '- No code-quality findings.';
 	const lessons = report.sharedLessons.map((lesson) => `- ${lesson}`).join('\n') || '- No shared lessons.';
-	return `# MaintainerBot Status\n\nLast updated: ${report.generatedAt}\n\n## Action inbox\n\n${actionInbox}\n\n## LLM audit status\n\n${auditSummary}\n\n## Draft PR candidates\n\nDraft PR creation is ${report.createdDraftPrs.length ? 'active for this run' : 'disabled or produced no PRs'}.\n\n${candidates}\n\n## Open PRs needing review\n\n${prMd}\n\n## Open issues needing triage\n\n${issueMd}\n\n## Repo health fixes\n\n### Best practices\n\n${bestPractices}\n\n### Efficiency\n\n${efficiency}\n\n### Code quality\n\n${codeQuality}\n\n## Summary\n\n${report.summary}\n\n- Owner: ${report.owner}\n- Mode: ${report.mode}\n- Repositories scanned: ${report.repoCount}\n- Open issues: ${report.issues.length}\n- Open PRs: ${report.pullRequests.length}\n\n## Draft PR creation results\n\n${created}\n\n## Shared lessons\n\n${lessons}\n`;
+	return `# MaintainerBot Status\n\nLast updated: ${report.generatedAt}\n\n## Action inbox\n\n${actionInbox}\n\n## LLM audit status\n\n${auditSummary}\n\n## Manual action candidates\n\nMaintainerBot is read-only; these are suggestions for a human to apply.\n\n${candidates}\n\n## Open PRs needing review\n\n${prMd}\n\n## Open issues needing triage\n\n${issueMd}\n\n## Repo health fixes\n\n### Best practices\n\n${bestPractices}\n\n### Efficiency\n\n${efficiency}\n\n### Code quality\n\n${codeQuality}\n\n## Summary\n\n${report.summary}\n\n- Owner: ${report.owner}\n- Mode: ${report.mode}\n- Repositories scanned: ${report.repoCount}\n- Open issues: ${report.issues.length}\n- Open PRs: ${report.pullRequests.length}\n\n## Read-only mutation status\n\n${created}\n\n## Shared lessons\n\n${lessons}\n`;
 }
 
 function renderAuditSummary(audits: AuditRunSummary) {
@@ -619,7 +619,7 @@ function prReason(item: WorkItem) {
 }
 
 function candidateAction(item: Recommendation) {
-	return item.risk === 'low' ? 'approve for draft PR creation or apply manually.' : 'review manually before enabling draft PR creation.';
+	return item.risk === 'low' ? 'consider applying manually after verification.' : 'review manually and gather more evidence before acting.';
 }
 
 function linkRepoInText(value: string) {
@@ -703,58 +703,10 @@ function slug(value: string) {
 	return value.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 80);
 }
 
-async function maybeCreateDraftPrs(report: MaintenanceReport, repos: RepoSummary[], env: Record<string, any>, headers: Record<string, string>, bucket?: R2BucketLike): Promise<CreatedDraftPr[]> {
-	if (env.CREATE_DRAFT_PRS !== 'true') return [];
-	if (!env.GITHUB_TOKEN) return [{ repo: '*', status: 'skipped', reason: 'GITHUB_TOKEN is required to create draft PRs.' }];
-	const allowlist = new Set(String(env.DRAFT_PR_REPO_ALLOWLIST || '').split(',').map((x) => x.trim()).filter(Boolean));
-	if (!allowlist.size) return [{ repo: '*', status: 'skipped', reason: 'DRAFT_PR_REPO_ALLOWLIST is empty.' }];
-	const results: CreatedDraftPr[] = [];
-	for (const candidate of report.draftPrCandidates.slice(0, 3)) {
-		if (!allowlist.has(candidate.repo)) {
-			results.push({ repo: candidate.repo, status: 'skipped', reason: 'Repo is not in DRAFT_PR_REPO_ALLOWLIST.' });
-			continue;
-		}
-		const repo = repos.find((item) => item.fullName === candidate.repo);
-		if (!repo) continue;
-		results.push(await createDraftPr(repo, candidate, headers));
-	}
-	if (bucket) await appendCreatedPrLedger(bucket, results);
-	return results;
-}
-
-async function appendCreatedPrLedger(bucket: R2BucketLike, results: CreatedDraftPr[]) {
-	const created = results.filter((result) => result.status === 'created');
-	if (!created.length) return;
-	const key = 'data/created-prs.json';
-	const existing = await bucket.get(key);
-	const ledger = existing ? JSON.parse(await existing.text()) : { version: 1, created: [] };
-	ledger.created.push(...created.map((result) => ({ ...result, createdAt: new Date().toISOString() })));
-	await bucket.put(key, `${JSON.stringify(ledger, null, 2)}\n`, { httpMetadata: { contentType: 'application/json' } });
-}
-
-async function createDraftPr(repo: RepoSummary, candidate: Recommendation, headers: Record<string, string>): Promise<CreatedDraftPr> {
-	try {
-		const branch = `maintainerbot/${candidate.fingerprint.split(':').pop()}`;
-		const baseRef = await gh(`https://api.github.com/repos/${repo.fullName}/git/ref/heads/${repo.defaultBranch}`, headers);
-		await gh(`https://api.github.com/repos/${repo.fullName}/git/refs`, headers, 'POST', { ref: `refs/heads/${branch}`, sha: baseRef.object.sha }).catch(() => undefined);
-		const path = 'MAINTAINERBOT.md';
-		const body = `# MaintainerBot Recommendation\n\n${candidate.title}\n\nReason: ${candidate.reason}\n\nVerification: ${candidate.verification}\n\nFingerprint: ${candidate.fingerprint}\n`;
-		await gh(`https://api.github.com/repos/${repo.fullName}/contents/${path}`, headers, 'PUT', {
-			message: candidate.title,
-			content: btoa(body),
-			branch,
-		});
-		const pr = await gh(`https://api.github.com/repos/${repo.fullName}/pulls`, headers, 'POST', {
-			title: candidate.title,
-			head: branch,
-			base: repo.defaultBranch,
-			body: `${candidate.reason}\n\nVerification: ${candidate.verification}\n\nFingerprint: ${candidate.fingerprint}`,
-			draft: true,
-		});
-		return { repo: repo.fullName, status: 'created', branch, url: pr.html_url };
-	} catch (error) {
-		return { repo: repo.fullName, status: 'failed', reason: error instanceof Error ? error.message : String(error) };
-	}
+async function maybeCreateDraftPrs(_report: MaintenanceReport, _repos: RepoSummary[], _env: Record<string, any>, _headers: Record<string, string>, _bucket?: R2BucketLike): Promise<CreatedDraftPr[]> {
+	// MaintainerBot is intentionally read-only. It may recommend actions, but it must not
+	// create branches, commits, pull requests, comments, labels, or other GitHub mutations.
+	return [];
 }
 
 async function maybeSendEmail(report: MaintenanceReport, env: Record<string, any>) {

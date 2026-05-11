@@ -1,12 +1,12 @@
 # MaintainerBot Evergreen Spec
 
-This is the evergreen product and technical spec for MaintainerBot. Keep this file updated whenever the intent, architecture, safety model, or roadmap changes.
+This is the detailed product and technical spec for MaintainerBot. The concise evolving intent lives in `docs/LIVING_SPEC.md`. Keep both updated whenever the intent, architecture, safety model, or roadmap changes.
 
 ## Product intent
 
 MaintainerBot is a daily open-source maintenance assistant for Adewale's recently active projects.
 
-It should help maintain many repositories by scanning project activity and quality signals, recommending concrete next steps, learning from accepted/rejected suggestions, and eventually preparing safe draft PRs with verification evidence. The scan includes only repositories updated since November 17, 2025.
+It should help maintain many repositories by scanning project activity and quality signals, recommending concrete next steps, learning from accepted/rejected suggestions, and preparing evidence-backed recommendations and verification steps. The scan includes only repositories updated since November 17, 2025.
 
 ## Current status
 
@@ -32,7 +32,6 @@ MaintainerBotOut.md              # latest living Markdown status page
 MaintainerBotOut.json            # latest machine-readable status
 data/rejections.json
 data/lessons.md
-data/created-prs.json
 reports/daily-maintenance-latest.md
 reports/daily-maintenance-latest.json
 reports/history/YYYY-MM-DD/daily-maintenance.md
@@ -71,7 +70,7 @@ Dated local reports under `reports/daily-maintenance-YYYY-MM-DD.*` are intention
 Current mode is conservative reporting only:
 
 - Scans public, non-fork, non-archived GitHub repositories for `GITHUB_OWNER`.
-- Produces a daily report with summary, priority actions, draft PR candidates, and shared lessons.
+- Produces a daily report with summary, priority actions, manual action candidates, and shared lessons.
 - Does not create PRs.
 - Does not send email.
 - Does not mutate repositories.
@@ -90,8 +89,7 @@ Every day, MaintainerBot should scan all of Adewale's projects and look at:
 Eventually, it should:
 
 - Identify and verify fixes.
-- Create safe draft PRs.
-- Email a series of PRs/recommendations that fix or improve projects.
+- Identify verification steps and manual PR candidates.
 - Track rejected ideas so it never repeats them.
 
 ## Core compounding loop
@@ -178,7 +176,6 @@ GITHUB_OWNER=adewale
 GITHUB_TOKEN=...
 FLUE_MODEL=anthropic/claude-haiku-4-5
 ANTHROPIC_API_KEY=...
-CREATE_DRAFT_PRS=false
 ```
 
 ## Safety model
@@ -202,10 +199,10 @@ Rules:
 Current safety rules:
 
 - The Cloudflare webhook requires `MAINTAINERBOT_WEBHOOK_SECRET` when that secret is configured.
-- No PR creation by default.
+- No PR creation.
 - No email sending by default.
-- No repository mutation by default.
-- Draft PR creation must require `CREATE_DRAFT_PRS=true`.
+- No repository mutation: no branches, commits, PRs, comments, labels, issue edits, releases, or repository setting changes.
+- Any GitHub token should be read-only if possible.
 - The bot must not repeat rejected ideas from `data/rejections.json`.
 - The bot should prefer small, reviewable changes.
 - Every proposed fix should include a verification step.
@@ -277,7 +274,7 @@ The LLM must:
 - cite evidence
 - avoid rejected fingerprints
 - prefer small, reviewable actions
-- never claim draft PRs were created
+- never claim GitHub state was changed
 
 Secrets are not included in this project context.
 
@@ -293,19 +290,19 @@ The daily report should eventually include:
 - Efficiency opportunities
 - Code quality opportunities
 - Shared cross-repo lessons
-- Draft PR candidates
+- Manual action candidates
 - Verification evidence
 - Rejected/repeated ideas filtered out
 
 Current report sections are arranged so the most actionable items come first:
 
 - Action inbox: ranked, clickable actions with why/action guidance
-- Draft PR candidates with stable fingerprints and suggested action
+- Manual action candidates with stable fingerprints and suggested action
 - Open PRs needing review with links, priority, rationale, and action
 - Open issues needing triage with links, priority, rationale, and action
 - Repo health fixes grouped by best practices, efficiency, and code quality
 - Summary and run metadata
-- Draft PR creation results
+- Read-only status / mutation results, which should always report no GitHub mutations
 - Shared lessons
 
 ## Rejection memory
@@ -355,35 +352,24 @@ Examples:
 - Avoid cosmetic-only churn unless explicitly requested.
 - Add setup/run instructions to README files for small tool repos.
 
-## Draft PR policy
+## Read-only GitHub policy
 
-Draft PR creation is implemented but disabled by default.
+MaintainerBot must not mutate GitHub. It can recommend actions, labels, PR ideas, or verification steps, but humans apply them.
 
-It only runs when all of the following are true:
+Forbidden actions:
 
-```bash
-CREATE_DRAFT_PRS=true
-GITHUB_TOKEN=...
-DRAFT_PR_REPO_ALLOWLIST=adewale/example,adewale/another-example
-```
+- creating branches, commits, or PRs
+- posting comments
+- adding/removing labels
+- editing issues, PRs, releases, repository metadata, or settings
+- publishing packages or releases
 
-When enabled, MaintainerBot currently creates small draft PRs for allowlisted repositories only. The first implementation writes a `MAINTAINERBOT.md` recommendation file on a `maintainerbot/*` branch and opens a draft PR with verification notes. This is intentionally conservative and should evolve toward real verified fixes.
+Allowed actions:
 
-It must:
-
-1. Use a strict allowlist of repositories.
-2. Create small branches only.
-3. Make low-risk changes first.
-4. Run tests/build/lint or provide static verification evidence.
-5. Open PRs as drafts.
-6. Include clear PR bodies:
-   - Summary
-   - Reason
-   - Files changed
-   - Verification
-   - Risk level
-7. Record created PRs in a local ledger.
-8. Never repeat rejected fingerprints.
+- read GitHub API metadata
+- read issue/PR/check/workflow information
+- clone public repos into temporary local/CI sandboxes for verification
+- write MaintainerBot's own R2 report/audit objects
 
 ## Status page policy
 
@@ -427,7 +413,6 @@ Prerequisites:
 
 Rules:
 
-- Include draft PR links once PR creation exists.
 - Support dry-run mode.
 - Avoid sending secrets or raw logs.
 
@@ -466,16 +451,16 @@ scan + rejection memory + lessons ledger + better report sections
 clone repos → inspect code → run checks → recommend evidence-backed fixes
 ```
 
-### Stage 4: Draft PR creator
+### Stage 4: Read-only deep auditor
 
 ```txt
-make small fixes → run checks → create draft PRs
+changed projects → clone in temporary sandbox → run checks → publish evidence-backed recommendations
 ```
 
-### Stage 5: Maintainer assistant
+### Stage 5: Maintainer handoff
 
 ```txt
-daily email → ranked PRs → rejection memory → cross-repo lessons
+living status page → ranked actions → rejection memory → cross-repo lessons
 ```
 
 ## Deferred work
@@ -491,11 +476,9 @@ Keep `TODO.md` and this spec in sync.
 ## Open design questions
 
 - Should MaintainerBot use local just-bash, local host filesystem, or remote sandbox for repository cloning?
-- What provider should send email?
-- Should accepted PRs be tracked automatically by merge status?
 - How should rejection fingerprints be generated?
 - Should the bot maintain per-repository profiles?
-- How aggressive should code-quality PR generation be?
+- How should read-only deep verification be scheduled and budgeted?
 
 ## Update rule
 

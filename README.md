@@ -2,11 +2,13 @@
 
 MaintainerBot is a Flue project for daily maintenance of Adewale's open-source projects.
 
-This README is the top-level intent document. The evergreen detailed spec lives in:
+This README is the top-level intent document. The concise living spec lives in:
 
 ```txt
-SPEC.md
+docs/LIVING_SPEC.md
 ```
+
+The detailed technical spec lives in `SPEC.md`.
 
 As the project evolves, update both this README and `SPEC.md` with the current product direction, safety constraints, operating assumptions, and lessons learned.
 
@@ -26,8 +28,7 @@ Every day it should look at:
 Eventually, MaintainerBot should:
 
 - Identify and verify fixes
-- Create safe draft PRs
-- Email me a series of PRs/recommendations that fix or improve those projects
+- Identify verification steps and manual PR candidates
 - Keep track of what I have rejected so it never repeats rejected ideas
 
 ## Current operating mode
@@ -35,7 +36,7 @@ Eventually, MaintainerBot should:
 For now, MaintainerBot is intentionally conservative:
 
 - It scans and reports.
-- It does **not** create PRs by default.
+- It is read-only: no branches, commits, PRs, comments, labels, or repo settings changes.
 - It does **not** send email by default.
 - In local mode, it emits the main human-readable report to:
 
@@ -58,7 +59,6 @@ MaintainerBotOut.md              # latest living Markdown status page
 MaintainerBotOut.json            # latest machine-readable status
 data/rejections.json
 data/lessons.md
-data/created-prs.json
 reports/daily-maintenance-latest.md
 reports/daily-maintenance-latest.json
 reports/history/YYYY-MM-DD/daily-maintenance.md
@@ -110,7 +110,6 @@ GITHUB_OWNER=adewale
 GITHUB_TOKEN=...
 FLUE_MODEL=anthropic/claude-haiku-4-5
 ANTHROPIC_API_KEY=...
-CREATE_DRAFT_PRS=false
 ```
 
 ## Run locally
@@ -183,13 +182,7 @@ pnpm exec wrangler secret put ANTHROPIC_API_KEY
 
 ## Safety
 
-Draft PR creation is implemented but intentionally not enabled by default. Keep:
-
-```bash
-CREATE_DRAFT_PRS=false
-```
-
-until the scan/report loop is producing useful recommendations. To enable it later, set `CREATE_DRAFT_PRS=true`, provide a `GITHUB_TOKEN`, and set `DRAFT_PR_REPO_ALLOWLIST` to the exact repos allowed to receive draft PRs.
+MaintainerBot is read-only. It may use an optional read-only GitHub token for higher API limits/private visibility, but it must not create branches, commits, PRs, comments, labels, issues, or repository setting changes.
 
 Rejected ideas should be tracked in:
 

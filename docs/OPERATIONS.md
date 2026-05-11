@@ -47,7 +47,6 @@ MaintainerBotOut.md
 MaintainerBotOut.json
 data/rejections.json
 data/lessons.md
-data/created-prs.json
 audits/index.json
 audits/projects/<owner>__<repo>/latest.json
 audits/projects/<owner>__<repo>/history/<timestamp>.json
@@ -120,18 +119,18 @@ EMAIL_DRY_RUN=false
 
 If `EMAIL_DRY_RUN=true`, `EMAIL_TO`/`EMAIL_FROM` are missing, or the `SEND_EMAIL` binding is unavailable, no email is sent.
 
-## Draft PRs
+## GitHub write operations
 
-Draft PR creation is disabled unless all are set:
+MaintainerBot is read-only. Do not configure write-scoped GitHub tokens. The bot must not create branches, commits, PRs, comments, labels, issues, releases, or repository setting changes.
+
+If a GitHub token is used, prefer the least-privileged read-only token available.
+
+## Deep verification
+
+Run the CLI-only read-only verifier locally or from GitHub Actions when a checkout/test pass is useful:
 
 ```bash
-CREATE_DRAFT_PRS=true
-GITHUB_TOKEN=...
-DRAFT_PR_REPO_ALLOWLIST=adewale/example,adewale/another-example
+pnpm run deep:verify -- --payload '{"repo":"adewale/project"}'
 ```
 
-Created draft PRs are recorded in R2:
-
-```txt
-data/created-prs.json
-```
+The verifier refuses repositories not changed since November 17, 2025 and does not push anything.

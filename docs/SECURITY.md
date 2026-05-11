@@ -36,6 +36,8 @@ pnpm run build:cloudflare
 
 CI also runs Gitleaks.
 
-## Draft PR safety
+## GitHub read-only safety
 
-Draft PR creation requires explicit opt-in and a repo allowlist. This prevents public webhook access, model output, or accidental config from modifying arbitrary repositories.
+MaintainerBot must not mutate GitHub. Do not configure write-scoped tokens. If `GITHUB_TOKEN` is provided, prefer a read-only token used only for API rate limits and reading public/private metadata as needed.
+
+Forbidden operations include creating branches, commits, PRs, comments, labels, issues, releases, or repository setting changes.
