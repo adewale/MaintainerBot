@@ -13,7 +13,7 @@ The agent:
 3. Scans GitHub repositories, issues, and PRs.
 4. Builds deterministic recommendations with stable fingerprints.
 5. Builds per-project context, including repo health, issues, PRs, deterministic findings, and root TODO files.
-6. Optionally uses an LLM for richer per-project recommendations from that context.
+6. Calls an LLM on every successful run to synthesize the final handoff from deterministic facts.
 7. Writes the living status page, latest aliases, audit ledgers, and historic reports to R2.
 8. Optionally sends email via Cloudflare Email Routing, though email is not a current priority.
 
@@ -52,7 +52,7 @@ CLI-only agents are used for heavyweight read-only workflows. `deep-verify` clon
 
 ## LLM context
 
-When model credentials exist, the agent computes an audit input hash for each project and only sends changed projects to the LLM. Each context includes repository metadata, health signals, open TODOs from root TODO files, open issues, open PRs, and deterministic findings. Secrets are not included.
+MaintainerBot requires LLM credentials. The agent always calls an LLM to synthesize the daily handoff from deterministic surface-audit facts. It also computes an audit input hash for each project and only sends changed projects to per-project LLM audits. Each context includes repository metadata, health signals, open TODOs from root TODO files, open issues, open PRs, and deterministic findings. Secrets are not included.
 
 LLM audit history is stored in R2:
 
@@ -64,7 +64,7 @@ audits/projects/<owner>__<repo>/history/<timestamp>.json
 
 ## Model routing
 
-If `ANTHROPIC_API_KEY` is configured, MaintainerBot can use:
+With `ANTHROPIC_API_KEY`, MaintainerBot can use:
 
 ```txt
 anthropic/claude-haiku-4-5

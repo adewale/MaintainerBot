@@ -64,7 +64,7 @@ Deferred work and future milestones.
 - [x] Keep current local `just-bash` scan path simple.
 - [x] Add CLI-only read-only verifier for real repo cloning and test runs.
 - [x] Add Cloudflare AI Gateway provider configuration.
-- [x] Add LLM-assisted summarization path; needs model credentials to activate.
+- [x] Require LLM-assisted daily synthesis on every successful invocation.
 - [x] Add changed-project-only LLM audit ledger in R2.
 
 ## Secret hygiene

@@ -242,7 +242,7 @@ Operational rules:
 
 ## LLM project-context handoff
 
-When model credentials are configured, MaintainerBot performs daily LLM audits only for projects whose audit inputs changed since their previous LLM audit. It hands the LLM a structured, deterministic project context object for each changed repository. This keeps GitHub/API scanning as the source of truth while letting the LLM improve prioritization and recommendations without re-auditing unchanged projects.
+MaintainerBot requires model credentials and calls an LLM on every successful invocation. Deterministic tools gather facts and heuristics first; the LLM synthesizes the daily human handoff from that supplied evidence. MaintainerBot also performs per-project LLM audits only for projects whose audit inputs changed since their previous LLM audit. It hands the LLM a structured, deterministic project context object for each changed repository. This keeps GitHub/API scanning as the source of truth while letting the LLM improve prioritization and recommendations without re-auditing unchanged projects.
 
 Each project context includes:
 
@@ -265,6 +265,8 @@ audits/index.json
 audits/projects/<owner>__<repo>/latest.json
 audits/projects/<owner>__<repo>/history/<timestamp>.json
 ```
+
+The run-level synthesis LLM call happens even when no project changed enough to require a fresh per-project audit.
 
 The LLM must:
 

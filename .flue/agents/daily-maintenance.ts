@@ -100,7 +100,7 @@ type CreatedDraftPr = {
 
 type MaintenanceReport = {
 	ok: true;
-	mode: 'deterministic-no-model' | 'llm-assisted';
+	mode: 'llm-assisted';
 	owner: string;
 	repoCount: number;
 	summary: string;
@@ -191,12 +191,15 @@ export default async function ({ init, env, payload }: FlueContext) {
 	const sandbox = () =>
 		new Bash({ fs, cwd: '/workspace', python: true, network: { dangerouslyAllowFullInternetAccess: true } });
 
-	const hasModel = Boolean(env.ANTHROPIC_API_KEY || env.OPENAI_API_KEY || env.OPENROUTER_API_KEY);
+	const hasLlmCredentials = Boolean(env.ANTHROPIC_API_KEY || env.OPENAI_API_KEY || env.OPENROUTER_API_KEY);
+	if (!hasLlmCredentials) {
+		return { ok: false, error: 'MaintainerBot requires LLM credentials. Configure ANTHROPIC_API_KEY, OPENAI_API_KEY, or OPENROUTER_API_KEY.' };
+	}
 	const useCloudflareAiGateway = Boolean(env.CLOUDFLARE_ACCOUNT_ID && env.CF_AI_GATEWAY_ID && env.ANTHROPIC_API_KEY);
 	const agent = await init({
 		sandbox,
 		cwd: '/workspace',
-		model: hasModel ? env.FLUE_MODEL || 'anthropic/claude-haiku-4-5' : false,
+		model: env.FLUE_MODEL || 'anthropic/claude-haiku-4-5',
 		providers: useCloudflareAiGateway
 			? {
 					anthropic: {
@@ -237,7 +240,6 @@ export default async function ({ init, env, payload }: FlueContext) {
 	const projectContexts = buildProjectContexts(repos, issues, pullRequests, deterministic.recommendations, rejected);
 
 	const llmAudits = await auditChangedProjects({
-		hasModel,
 		bucket: reportsBucket,
 		session,
 		projectContexts,
@@ -246,18 +248,34 @@ export default async function ({ init, env, payload }: FlueContext) {
 		generatedAt,
 	});
 	const auditRecommendations = llmAudits.results.flatMap((audit) => audit.recommendations).filter((item) => !rejected.has(item.fingerprint));
-	const mergedRecommendations = [...auditRecommendations, ...deterministic.recommendations];
+	const llmReport = await synthesizeRunReport(session, {
+		owner,
+		repos,
+		issues,
+		pullRequests,
+		projectContexts,
+		deterministic,
+		llmAudits,
+		rejected,
+		lessons,
+	});
+	const llmProjectRecommendations = llmReport.projectRecommendations.filter((item) => !rejected.has(item.fingerprint));
+	const manualActionCandidates = llmReport.draftPrCandidates.filter((item) => !rejected.has(item.fingerprint));
+	const mergedRecommendations = [...llmProjectRecommendations, ...auditRecommendations, ...deterministic.recommendations];
 
 	const report: MaintenanceReport = {
 		ok: true,
-		mode: hasModel ? 'llm-assisted' : 'deterministic-no-model',
+		mode: 'llm-assisted',
 		owner,
 		repoCount: repos.length,
 		generatedAt,
 		...deterministic,
+		summary: llmReport.summary,
+		priorityActions: llmReport.priorityActions,
 		recommendations: mergedRecommendations,
-		projectRecommendations: auditRecommendations,
-		draftPrCandidates: mergedRecommendations.filter((item) => item.risk === 'low').slice(0, 8),
+		projectRecommendations: [...llmProjectRecommendations, ...auditRecommendations],
+		draftPrCandidates: manualActionCandidates,
+		sharedLessons: llmReport.sharedLessons,
 		llmAudits,
 	};
 
@@ -397,8 +415,50 @@ function buildProjectContexts(
 	}));
 }
 
+async function synthesizeRunReport(session: any, options: {
+	owner: string;
+	repos: RepoSummary[];
+	issues: WorkItem[];
+	pullRequests: WorkItem[];
+	projectContexts: ProjectContext[];
+	deterministic: Omit<MaintenanceReport, 'ok' | 'mode' | 'owner' | 'repoCount' | 'generatedAt' | 'r2' | 'llmAudits'>;
+	llmAudits: AuditRunSummary;
+	rejected: Set<string>;
+	lessons: string;
+}) {
+	return session.prompt(
+		`Create today's read-only MaintainerBot handoff from deterministic surface-audit facts.
+
+Owner: ${options.owner}
+Repositories scanned: ${options.repos.length}
+Open issues: ${options.issues.length}
+Open PRs: ${options.pullRequests.length}
+
+Deterministic report JSON:
+${JSON.stringify(options.deterministic, null, 2)}
+
+Project contexts JSON:
+${JSON.stringify(options.projectContexts, null, 2)}
+
+Changed-project LLM audit summary JSON:
+${JSON.stringify(options.llmAudits, null, 2)}
+
+Rejected fingerprints:
+${JSON.stringify([...options.rejected], null, 2)}
+
+Lessons ledger:
+${options.lessons}
+
+Use only supplied facts. Do not invent repositories, files, issues, PRs, TODOs, CI results, code behavior, or verification results.
+MaintainerBot is read-only: do not claim it created branches, commits, PRs, comments, labels, or other GitHub changes.
+Lean on deterministic findings and project contexts. Rank the human handoff by evidence, urgency, and likely impact.
+If evidence is weak, recommend investigation rather than action.
+Return concise, actionable recommendations with stable fingerprints and evidence.`,
+		{ role: 'maintainer', result: ReportSchema },
+	);
+}
+
 async function auditChangedProjects(options: {
-	hasModel: boolean;
 	bucket: R2BucketLike | undefined;
 	session: any;
 	projectContexts: ProjectContext[];
@@ -406,7 +466,7 @@ async function auditChangedProjects(options: {
 	lessons: string;
 	generatedAt: string;
 }): Promise<AuditRunSummary> {
-	if (!options.hasModel || !options.bucket) {
+	if (!options.bucket) {
 		return {
 			audited: [],
 			carriedForward: [],

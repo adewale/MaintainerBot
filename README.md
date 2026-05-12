@@ -109,7 +109,7 @@ Edit `.env` as needed:
 GITHUB_OWNER=adewale
 GITHUB_TOKEN=...
 FLUE_MODEL=anthropic/claude-haiku-4-5
-ANTHROPIC_API_KEY=...
+ANTHROPIC_API_KEY=... # required; every successful run calls an LLM
 ```
 
 ## Run locally
@@ -177,7 +177,7 @@ Set secrets when needed:
 ```bash
 pnpm exec wrangler secret put MAINTAINERBOT_WEBHOOK_SECRET
 pnpm exec wrangler secret put GITHUB_TOKEN
-pnpm exec wrangler secret put ANTHROPIC_API_KEY
+pnpm exec wrangler secret put ANTHROPIC_API_KEY # required; the Worker returns a config error without it
 ```
 
 ## Safety

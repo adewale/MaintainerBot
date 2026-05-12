@@ -119,6 +119,16 @@ EMAIL_DRY_RUN=false
 
 If `EMAIL_DRY_RUN=true`, `EMAIL_TO`/`EMAIL_FROM` are missing, or the `SEND_EMAIL` binding is unavailable, no email is sent.
 
+## Required LLM credentials
+
+Every successful MaintainerBot invocation calls an LLM after deterministic scanning. Configure at least one model provider secret before deploying/running:
+
+```bash
+pnpm exec wrangler secret put ANTHROPIC_API_KEY
+```
+
+Without a provider key, the Worker returns a configuration error instead of producing a deterministic-only report.
+
 ## GitHub write operations
 
 MaintainerBot is read-only. Do not configure write-scoped GitHub tokens. The bot must not create branches, commits, PRs, comments, labels, issues, releases, or repository setting changes.
