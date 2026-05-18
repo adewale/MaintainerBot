@@ -16,6 +16,9 @@ type RepoHealth = {
 
 type ProjectContext = {
 	repo: string;
+	stateFingerprint: string;
+	inputHash: string;
+	rebuiltThisRun: boolean;
 	url: string;
 	description: string | null;
 	language: string | null;
@@ -33,6 +36,8 @@ type ProjectRecommendation = Recommendation & {
 	evidence: string[];
 	recommendedAction: string;
 };
+
+type BaseRepoSummary = Omit<RepoSummary, 'health' | 'openTodos'>;
 
 type RepoSummary = {
 	name: string;
@@ -118,6 +123,25 @@ type MaintenanceReport = {
 	sharedLessons: string[];
 	generatedAt: string;
 	r2?: { bucket: string; keys: string[] };
+};
+
+type ContextIndex = {
+	version: 1;
+	lastRunAt: string;
+	projects: Record<string, {
+		stateFingerprint: string;
+		inputHash: string;
+		latestContextKey: string;
+		latestAuditKey?: string;
+		lastBuiltAt: string;
+	}>;
+};
+
+type PreparedContexts = {
+	repos: RepoSummary[];
+	projectContexts: ProjectContext[];
+	rebuilt: string[];
+	reused: string[];
 };
 
 type R2BucketLike = {
@@ -229,15 +253,37 @@ export default async function ({ init, env, payload }: FlueContext) {
 	await session.shell(`cat > /workspace/data/lessons.md <<'EOF'\n${lessons}\nEOF`);
 
 	const cutoff = '2025-11-17T00:00:00.000Z';
-	const repos = (await fetchRepos(owner, githubHeaders)).filter((repo) => repo.pushedAt && repo.pushedAt >= cutoff);
-	await session.shell(`cat > /workspace/reports/repo-summary.json <<'EOF'\n${JSON.stringify(repos, null, 2)}\nEOF`);
-	const repoNames = new Set(repos.map((repo) => repo.fullName));
+	const baseRepos = (await fetchRepos(owner, githubHeaders)).filter((repo) => repo.pushedAt && repo.pushedAt >= cutoff);
+	const repoNames = new Set(baseRepos.map((repo) => repo.fullName));
 	const issues = (await fetchSearchItems(`user:${owner} is:issue is:open`, githubHeaders)).filter((item) => repoNames.has(item.repo));
 	const pullRequests = (await fetchSearchItems(`user:${owner} is:pr is:open`, githubHeaders)).filter((item) => repoNames.has(item.repo));
 
 	const generatedAt = new Date().toISOString();
+	const prepared = await prepareProjectContexts({
+		bucket: reportsBucket,
+		baseRepos,
+		issues,
+		pullRequests,
+		rejected,
+		lessons,
+		generatedAt,
+		headers: githubHeaders,
+		owner,
+	});
+	const repos = prepared.repos;
+	await session.shell(`cat > /workspace/reports/repo-summary.json <<'EOF'\n${JSON.stringify(repos, null, 2)}\nEOF`);
 	const deterministic = buildDeterministicReport(repos, issues, pullRequests, rejected);
-	const projectContexts = buildProjectContexts(repos, issues, pullRequests, deterministic.recommendations, rejected);
+	const projectContexts = await finalizeProjectContexts({
+		bucket: reportsBucket,
+		prepared,
+		repos,
+		issues,
+		pullRequests,
+		recommendations: deterministic.recommendations,
+		rejected,
+		lessons,
+		generatedAt,
+	});
 
 	const llmAudits = await auditChangedProjects({
 		bucket: reportsBucket,
@@ -289,7 +335,7 @@ export default async function ({ init, env, payload }: FlueContext) {
 	return report;
 }
 
-async function fetchRepos(owner: string, headers: Record<string, string>): Promise<RepoSummary[]> {
+async function fetchRepos(owner: string, headers: Record<string, string>): Promise<BaseRepoSummary[]> {
 	const response = await fetch(`https://api.github.com/users/${owner}/repos?per_page=100&sort=updated`, { headers });
 	const text = await response.text();
 	if (!response.ok) throw new Error(`GitHub repos API failed: ${response.status} ${text}`);
@@ -306,7 +352,7 @@ async function fetchRepos(owner: string, headers: Record<string, string>): Promi
 			language: repo.language,
 			defaultBranch: repo.default_branch ?? 'main',
 		}));
-	return await Promise.all(baseRepos.map(async (repo) => ({ ...repo, health: await fetchRepoHealth(repo.fullName, headers), openTodos: await fetchOpenTodos(repo.fullName, headers) })));
+	return baseRepos;
 }
 
 async function fetchOpenTodos(fullName: string, headers: Record<string, string>): Promise<string[]> {
@@ -394,24 +440,145 @@ function rejectedFingerprints(rejectionsJson: string) {
 	}
 }
 
-function buildProjectContexts(
+async function prepareProjectContexts(options: {
+	bucket: R2BucketLike | undefined;
+	baseRepos: BaseRepoSummary[];
+	issues: WorkItem[];
+	pullRequests: WorkItem[];
+	rejected: Set<string>;
+	lessons: string;
+	generatedAt: string;
+	headers: Record<string, string>;
+	owner: string;
+}): Promise<PreparedContexts> {
+	const previousIndex = await readContextIndex(options.bucket);
+	const memoryHash = await sha256(stableJson({ lessons: options.lessons, rejected: [...options.rejected].sort() }));
+	const repos: RepoSummary[] = [];
+	const projectContexts: ProjectContext[] = [];
+	const rebuilt: string[] = [];
+	const reused: string[] = [];
+
+	for (const repo of options.baseRepos) {
+		const stateFingerprint = await projectStateFingerprint(repo, options.issues, options.pullRequests, memoryHash);
+		const previous = previousIndex.projects[repo.fullName];
+		const previousContext = previous?.stateFingerprint === stateFingerprint ? await readJson<ProjectContext>(options.bucket, previous.latestContextKey) : null;
+		if (previousContext) {
+			repos.push({ ...repo, health: previousContext.health, openTodos: previousContext.openTodos });
+			projectContexts.push({ ...previousContext, rebuiltThisRun: false });
+			reused.push(repo.fullName);
+			continue;
+		}
+
+		const health = await fetchRepoHealth(repo.fullName, options.headers);
+		const openTodos = await fetchOpenTodos(repo.fullName, options.headers);
+		repos.push({ ...repo, health, openTodos });
+		rebuilt.push(repo.fullName);
+	}
+
+	return { repos, projectContexts, rebuilt, reused };
+}
+
+async function finalizeProjectContexts(options: {
+	bucket: R2BucketLike | undefined;
+	prepared: PreparedContexts;
+	repos: RepoSummary[];
+	issues: WorkItem[];
+	pullRequests: WorkItem[];
+	recommendations: Recommendation[];
+	rejected: Set<string>;
+	lessons: string;
+	generatedAt: string;
+}): Promise<ProjectContext[]> {
+	const byRepo = new Map(options.prepared.projectContexts.map((context) => [context.repo, context]));
+	for (const context of await buildProjectContexts(options.repos, options.issues, options.pullRequests, options.recommendations, options.rejected, options.lessons)) {
+		const existing = byRepo.get(context.repo);
+		if (existing && existing.stateFingerprint === context.stateFingerprint) continue;
+		byRepo.set(context.repo, context);
+	}
+	const contexts = options.repos.map((repo) => byRepo.get(repo.fullName)).filter(Boolean) as ProjectContext[];
+	if (options.bucket) await writeContextBundles(options.bucket, contexts, options.generatedAt);
+	return contexts;
+}
+
+async function projectStateFingerprint(repo: BaseRepoSummary | RepoSummary, issues: WorkItem[], pullRequests: WorkItem[], memoryHash: string) {
+	return sha256(stableJson({
+		repo: repo.fullName,
+		pushedAt: repo.pushedAt,
+		description: repo.description,
+		language: repo.language,
+		defaultBranch: repo.defaultBranch,
+		openIssues: repo.openIssues,
+		issues: issues.filter((issue) => issue.repo === repo.fullName).map((issue) => [issue.number, issue.updatedAt, issue.title, issue.labels]).sort(),
+		pullRequests: pullRequests.filter((pr) => pr.repo === repo.fullName).map((pr) => [pr.number, pr.updatedAt, pr.title, pr.labels]).sort(),
+		memoryHash,
+	}));
+}
+
+async function readContextIndex(bucket: R2BucketLike | undefined): Promise<ContextIndex> {
+	const existing = await readJson<ContextIndex>(bucket, 'contexts/index.json');
+	return existing ?? { version: 1, lastRunAt: '', projects: {} };
+}
+
+async function readJson<T>(bucket: R2BucketLike | undefined, key: string): Promise<T | null> {
+	if (!bucket) return null;
+	const existing = await bucket.get(key);
+	if (!existing) return null;
+	try {
+		return JSON.parse(await existing.text()) as T;
+	} catch {
+		return null;
+	}
+}
+
+async function writeContextBundles(bucket: R2BucketLike, contexts: ProjectContext[], generatedAt: string) {
+	const runId = generatedAt.replace(/[:.]/g, '-');
+	const index: ContextIndex = { version: 1, lastRunAt: generatedAt, projects: {} };
+	for (const context of contexts) {
+		const prefix = `contexts/projects/${context.repo.replace('/', '__')}`;
+		const latestContextKey = `${prefix}/latest.json`;
+		const historyKey = `${prefix}/history/${runId}.json`;
+		if (context.rebuiltThisRun) {
+			await bucket.put(latestContextKey, `${JSON.stringify(context, null, 2)}\n`, { httpMetadata: { contentType: 'application/json' } });
+			await bucket.put(historyKey, `${JSON.stringify(context, null, 2)}\n`, { httpMetadata: { contentType: 'application/json' } });
+		}
+		index.projects[context.repo] = {
+			stateFingerprint: context.stateFingerprint,
+			inputHash: context.inputHash,
+			latestContextKey,
+			latestAuditKey: `audits/projects/${context.repo.replace('/', '__')}/latest.json`,
+			lastBuiltAt: context.rebuiltThisRun ? generatedAt : context.lastPushed ?? generatedAt,
+		};
+	}
+	await bucket.put('contexts/index.json', `${JSON.stringify(index, null, 2)}\n`, { httpMetadata: { contentType: 'application/json' } });
+	await bucket.put(`contexts/runs/${runId}.json`, `${JSON.stringify({ generatedAt, projects: contexts.map((context) => ({ repo: context.repo, stateFingerprint: context.stateFingerprint, inputHash: context.inputHash, r2Key: `contexts/projects/${context.repo.replace('/', '__')}/latest.json`, rebuiltThisRun: context.rebuiltThisRun })) }, null, 2)}\n`, { httpMetadata: { contentType: 'application/json' } });
+}
+
+async function buildProjectContexts(
 	repos: RepoSummary[],
 	issues: WorkItem[],
 	pullRequests: WorkItem[],
 	recommendations: Recommendation[],
 	rejected: Set<string>,
-): ProjectContext[] {
-	return repos.map((repo) => ({
-		repo: repo.fullName,
-		url: repo.url,
-		description: repo.description,
-		language: repo.language,
-		lastPushed: repo.pushedAt,
-		health: repo.health,
-		openTodos: repo.openTodos,
-		openIssues: issues.filter((issue) => issue.repo === repo.fullName),
-		openPullRequests: pullRequests.filter((pr) => pr.repo === repo.fullName),
-		deterministicFindings: recommendations.filter((item) => item.repo === repo.fullName && !rejected.has(item.fingerprint)),
+	lessons: string,
+): Promise<ProjectContext[]> {
+	const memoryHash = await sha256(stableJson({ lessons, rejected: [...rejected].sort() }));
+	return await Promise.all(repos.map(async (repo) => {
+		const stateFingerprint = await projectStateFingerprint(repo, issues, pullRequests, memoryHash);
+		const base = {
+			repo: repo.fullName,
+			stateFingerprint,
+			rebuiltThisRun: true,
+			url: repo.url,
+			description: repo.description,
+			language: repo.language,
+			lastPushed: repo.pushedAt,
+			health: repo.health,
+			openTodos: repo.openTodos,
+			openIssues: issues.filter((issue) => issue.repo === repo.fullName),
+			openPullRequests: pullRequests.filter((pr) => pr.repo === repo.fullName),
+			deterministicFindings: recommendations.filter((item) => item.repo === repo.fullName && !rejected.has(item.fingerprint)),
+		};
+		return { ...base, inputHash: await sha256(stableJson(base)) };
 	}));
 }
 
@@ -479,20 +646,9 @@ async function auditChangedProjects(options: {
 	const audited: string[] = [];
 	const carriedForward: string[] = [];
 	const skipped: string[] = [];
-	const lessonsHash = await sha256(options.lessons);
 
 	for (const project of options.projectContexts) {
-		const auditInput = {
-			repo: project.repo,
-			lastPushed: project.lastPushed,
-			health: project.health,
-			openTodos: project.openTodos,
-			issues: project.openIssues.map((issue) => ({ number: issue.number, title: issue.title, updatedAt: issue.updatedAt, labels: issue.labels })),
-			pullRequests: project.openPullRequests.map((pr) => ({ number: pr.number, title: pr.title, updatedAt: pr.updatedAt, labels: pr.labels })),
-			findings: project.deterministicFindings.map((finding) => finding.fingerprint),
-			lessonsHash,
-		};
-		const inputHash = await sha256(stableJson(auditInput));
+		const inputHash = project.inputHash;
 		const keyPrefix = `audits/projects/${project.repo.replace('/', '__')}`;
 		const latestKey = `${keyPrefix}/latest.json`;
 		const latest = await options.bucket.get(latestKey);
@@ -624,7 +780,7 @@ function renderMarkdown(report: MaintenanceReport) {
 function renderAuditSummary(audits: AuditRunSummary) {
 	const audited = audits.audited.length ? audits.audited.map((repo) => `- Audited: [${repo}](https://github.com/${repo})`).join('\n') : '- No projects needed a fresh LLM audit.';
 	const carried = audits.carriedForward.length ? audits.carriedForward.map((repo) => `- Carried forward: [${repo}](https://github.com/${repo})`).join('\n') : '- No carried-forward audits.';
-	const skipped = audits.skipped.length ? `- Skipped ${audits.skipped.length} project(s) because no model/R2 audit path was available.` : '- No projects skipped.';
+	const skipped = audits.skipped.length ? `- Skipped ${audits.skipped.length} project(s) because R2 audit persistence was unavailable.` : '- No projects skipped.';
 	return `${audited}\n${carried}\n${skipped}`;
 }
 

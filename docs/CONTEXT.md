@@ -34,7 +34,7 @@ MaintainerBot uses two context granularities:
 1. **Run context bundle**: account-level snapshot for one invocation.
 2. **Project context bundle**: repo-level snapshot used for per-project LLM audits and replay.
 
-The project state fingerprint is the cheapest cache key. If it has not changed, MaintainerBot does not rebuild that project's full context bundle; it reuses the previous `latest.json` context bundle and carries forward the previous project audit. The project context bundle is rebuilt only after cheap discovery says the project changed.
+The project state fingerprint is the cheapest cache key. If it has not changed, MaintainerBot does not rebuild that project's full context bundle; it reuses the previous `latest.json` context bundle and carries forward the previous project audit. The project context bundle is rebuilt only after cheap discovery says the project changed. The current implementation stores `contexts/index.json`, stores project context bundles only when rebuilt, and writes each run's context refs to `contexts/runs/<runId>.json`.
 
 Cheap discovery should avoid expensive/full context work. It can use signals such as:
 
