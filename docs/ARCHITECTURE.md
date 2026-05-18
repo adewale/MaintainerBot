@@ -50,6 +50,16 @@ The daily agent uses a lightweight `just-bash` sandbox for local scratch files. 
 
 CLI-only agents are used for heavyweight read-only workflows. `deep-verify` clones changed repos into temporary local sandboxes, runs safe allowlisted verification commands, and summarizes evidence without mutating GitHub.
 
+## Context bundles
+
+MaintainerBot separates durable memory, ephemeral loaded facts, and execution capabilities. Each run should produce a stored account-level run context bundle and one stored project context bundle per scanned project. Project bundle hashes decide whether a per-project LLM audit is needed. Stored context bundles enable local replay and multi-agent/model comparison without re-running GitHub loaders.
+
+See:
+
+```txt
+docs/CONTEXT.md
+```
+
 ## LLM context
 
 MaintainerBot requires LLM credentials. The agent always calls an LLM to synthesize the daily handoff from deterministic surface-audit facts. It also computes an audit input hash for each project and only sends changed projects to per-project LLM audits. Each context includes repository metadata, health signals, open TODOs from root TODO files, open issues, open PRs, and deterministic findings. Secrets are not included.

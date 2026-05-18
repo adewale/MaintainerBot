@@ -240,6 +240,59 @@ Operational rules:
 - Rotate the webhook secret if it is exposed in logs, screenshots, shell history, or chat.
 - Prefer a dedicated random secret, not a reused password or API token.
 
+## Context bundles and LLM handoff
+
+MaintainerBot treats LLM context as a durable, replayable artifact. Deterministic loaders gather facts; the system stores normalized context bundles; LLMs consume those bundles.
+
+Daily workflow:
+
+```txt
+Daily cron/webhook
+  → load durable memory from R2
+  → run deterministic read-only loaders
+  → build account-level run context bundle
+  → build one project context bundle per scanned project
+  → hash each project context bundle
+  → compare hashes with previous R2 state
+  → call LLM only for changed project bundles
+  → store project context bundles and project LLM audit outputs in R2
+  → call LLM once for run-level synthesis using deterministic facts + latest project audits
+  → store living status page and JSON in R2
+```
+
+This lets MaintainerBot replay a previous audit locally from stored R2 context, and lets multiple agents/models evaluate the same context bundle for comparison.
+
+Context bundle signatures live in:
+
+```txt
+docs/CONTEXT.md
+```
+
+Primary LLM injection signatures:
+
+```ts
+async function auditProjectWithLlm(
+  session: FlueSession,
+  bundle: ProjectContextBundle,
+): Promise<ProjectAudit>;
+
+async function synthesizeRunWithLlm(
+  session: FlueSession,
+  bundle: MaintainerBotRunContextBundle,
+): Promise<MaintenanceReport>;
+```
+
+R2 context layout:
+
+```txt
+contexts/runs/<runId>.json
+contexts/projects/<owner>__<repo>/latest.json
+contexts/projects/<owner>__<repo>/history/<runId>.json
+audits/projects/<owner>__<repo>/latest.json
+audits/projects/<owner>__<repo>/history/<runId>.json
+audits/index.json
+```
+
 ## LLM project-context handoff
 
 MaintainerBot requires model credentials and calls an LLM on every successful invocation. Deterministic tools gather facts and heuristics first; the LLM synthesizes the daily human handoff from that supplied evidence. MaintainerBot also performs per-project LLM audits only for projects whose audit inputs changed since their previous LLM audit. It hands the LLM a structured, deterministic project context object for each changed repository. This keeps GitHub/API scanning as the source of truth while letting the LLM improve prioritization and recommendations without re-auditing unchanged projects.

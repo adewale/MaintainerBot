@@ -59,6 +59,14 @@ Deferred work and future milestones.
 - [x] Add shared-secret protection for the public webhook endpoint.
 - [ ] Consider moving from payload secret to header-based auth if Flue exposes request headers.
 
+## Context bundles
+
+- [x] Document durable run/project context bundle model.
+- [ ] Persist run context bundles to `contexts/runs/<runId>.json`.
+- [ ] Persist project context bundles to `contexts/projects/<owner>__<repo>/*`.
+- [ ] Add local replay command that reads a stored context bundle and re-runs LLM synthesis.
+- [ ] Add comparison workflow for multiple agents/models over the same stored context.
+
 ## Flue/runtime evolution
 
 - [x] Keep current local `just-bash` scan path simple.
