@@ -248,19 +248,20 @@ Daily workflow:
 
 ```txt
 Daily cron/webhook
-  → load durable memory from R2
-  → run deterministic read-only loaders
-  → build account-level run context bundle
-  → build one project context bundle per scanned project
-  → hash each project context bundle
-  → compare hashes with previous R2 state
+  → load durable memory and previous context index from R2
+  → run cheap deterministic discovery loaders
+  → compute one project state fingerprint per eligible repo
+  → compare project state fingerprints with previous context index
+  → reuse previous project context bundles for unchanged projects
+  → build fresh project context bundles only for changed projects
   → call LLM only for changed project bundles
-  → store project context bundles and project LLM audit outputs in R2
-  → call LLM once for run-level synthesis using deterministic facts + latest project audits
-  → store living status page and JSON in R2
+  → store new project context bundles and project LLM audit outputs in R2
+  → build account-level run context bundle from refs + latest audits
+  → call LLM once for run-level synthesis
+  → store living status page, run context, and JSON in R2
 ```
 
-This lets MaintainerBot replay a previous audit locally from stored R2 context, and lets multiple agents/models evaluate the same context bundle for comparison.
+This lets MaintainerBot skip full context construction for unchanged projects, replay a previous audit locally from stored R2 context, and let multiple agents/models evaluate the same context bundle for comparison.
 
 Context bundle signatures live in:
 
@@ -285,6 +286,7 @@ async function synthesizeRunWithLlm(
 R2 context layout:
 
 ```txt
+contexts/index.json
 contexts/runs/<runId>.json
 contexts/projects/<owner>__<repo>/latest.json
 contexts/projects/<owner>__<repo>/history/<runId>.json

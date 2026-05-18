@@ -4,7 +4,7 @@ MaintainerBot is a read-only maintenance assistant for Adewale's public open-sou
 
 It scans only repositories that changed since November 17, 2025, gathers deterministic GitHub/project signals, and publishes an action-first living status page backed by R2.
 
-Every successful invocation calls an LLM. Deterministic tools gather facts first; the LLM synthesizes the final human handoff from those facts. Context is a first-class artifact: each run creates a stored run context bundle, and each changed project creates a stored project context bundle. Per-project LLM audits run only when a project's context hash changes; unchanged projects carry forward their previous audit. The run still performs an LLM synthesis call using deterministic facts and latest project audits.
+Every successful invocation calls an LLM. Deterministic tools gather facts first; the LLM synthesizes the final human handoff from those facts. Context is a first-class artifact: each run creates a stored run context bundle, while project context bundles are rebuilt only when cheap deterministic discovery detects a changed project state fingerprint. Per-project LLM audits run only when a project's context changes; unchanged projects reuse their previous context bundle and carry forward their previous audit. The run still performs an LLM synthesis call using deterministic facts and latest project audits.
 
 MaintainerBot may recommend actions, verification steps, labels, or PR ideas, but it must not mutate GitHub: no branches, commits, PRs, comments, labels, issue edits, or repository settings changes.
 
