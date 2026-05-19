@@ -52,7 +52,7 @@ CLI-only agents are used for heavyweight read-only workflows. `deep-verify` clon
 
 ## Context bundles
 
-MaintainerBot separates durable memory, ephemeral loaded facts, and execution capabilities. Each run should produce a stored account-level run context bundle and one stored project context bundle per scanned project. Project bundle hashes decide whether a per-project LLM audit is needed. Stored context bundles enable local replay and multi-agent/model comparison without re-running GitHub loaders.
+MaintainerBot separates durable memory, cheap discovery, context bundles, and LLM outputs. Each run stores an account-level run context bundle. Project context bundles are rebuilt only when a cheap project state fingerprint changes. Stored context bundles enable local replay and multi-agent/model comparison without re-running GitHub loaders.
 
 See:
 
@@ -62,7 +62,7 @@ docs/CONTEXT.md
 
 ## LLM context
 
-MaintainerBot requires LLM credentials. The agent always calls an LLM to synthesize the daily handoff from deterministic surface-audit facts. It also computes an audit input hash for each project and only sends changed projects to per-project LLM audits. Each context includes repository metadata, health signals, open TODOs from root TODO files, open issues, open PRs, and deterministic findings. Secrets are not included.
+MaintainerBot requires LLM credentials. The agent always calls an LLM to synthesize the daily handoff from deterministic surface-audit facts. It computes state/input hashes for each project and only sends changed project bundles to per-project LLM audits. Each context includes repository metadata, health signals, open TODOs from root TODO files, open issues, open PRs, and deterministic findings. Secrets are not included.
 
 LLM audit history is stored in R2:
 
@@ -74,7 +74,7 @@ audits/projects/<owner>__<repo>/history/<timestamp>.json
 
 ## Model routing
 
-With `ANTHROPIC_API_KEY`, MaintainerBot can use:
+With provider secrets, MaintainerBot can use Anthropic, OpenAI, or OpenRouter models. With `ANTHROPIC_API_KEY`, it can also use:
 
 ```txt
 anthropic/claude-haiku-4-5

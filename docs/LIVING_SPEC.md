@@ -1,15 +1,20 @@
 # MaintainerBot Living Spec
 
-MaintainerBot is a read-only maintenance assistant for Adewale's public open-source projects.
+MaintainerBot is a read-only daily maintenance handoff for Adewale's public open-source projects.
 
-It scans only repositories that changed since November 17, 2025, gathers deterministic GitHub/project signals, and publishes an action-first living status page backed by R2.
+It only considers repositories changed since November 17, 2025.
 
-Every successful invocation calls an LLM. Deterministic tools gather facts first; the LLM synthesizes the final human handoff from those facts. Context is a first-class artifact: each run creates a stored run context bundle, while project context bundles are rebuilt only when cheap deterministic discovery detects a changed project state fingerprint. Per-project LLM audits run only when a project's context changes; unchanged projects reuse their previous context bundle and carry forward their previous audit. The run still performs an LLM synthesis call using deterministic facts and latest project audits.
+Each run:
 
-MaintainerBot may recommend actions, verification steps, labels, or PR ideas, but it must not mutate GitHub: no branches, commits, PRs, comments, labels, issue edits, or repository settings changes.
+1. Reads GitHub/R2 facts with deterministic code.
+2. Uses cheap project fingerprints to skip unchanged project context rebuilds.
+3. Stores durable context bundles in R2.
+4. Calls the LLM for changed project audits.
+5. Always calls the LLM once to synthesize the daily handoff.
+6. Publishes the living status page from deterministic facts plus latest audits.
 
-Deep verification should happen in read-only CLI workflows that clone repos into temporary sandboxes, run safe checks/tests/builds, summarize evidence, and store/report results without pushing anything.
+MaintainerBot must not mutate GitHub: no branches, commits, PRs, comments, labels, issue edits, releases, or repository settings changes. A GitHub token, if used, should be read-only.
 
-Stored context bundles make audits replayable locally and comparable across multiple agents/models without re-running GitHub loaders.
+Replay is first-class. A stored context bundle plus prompt version, model, schema version, and output should be enough to re-run or compare audits locally without hitting GitHub again.
 
-The goal is a trustworthy daily handoff: what changed, what matters, why it matters, and how to verify the next human action.
+Phase 1 is surface audit only. Later phases may add read-only checkout/eval/coding-agent workflows, but those workflows produce additional evidence artifacts; they do not change the Phase 1 contract.

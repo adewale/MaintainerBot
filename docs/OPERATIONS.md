@@ -125,6 +125,10 @@ Every successful MaintainerBot invocation calls an LLM after deterministic scann
 
 ```bash
 pnpm exec wrangler secret put ANTHROPIC_API_KEY
+# or
+pnpm exec wrangler secret put OPENAI_API_KEY
+# or
+pnpm exec wrangler secret put OPENROUTER_API_KEY
 ```
 
 Without a provider key, the Worker returns a configuration error instead of producing a deterministic-only report.

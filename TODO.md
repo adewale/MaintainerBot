@@ -63,7 +63,7 @@ Deferred work and future milestones.
 
 - [x] Document durable run/project context bundle model.
 - [x] Persist context index to `contexts/index.json` with project state fingerprints.
-- [x] Persist run context bundle refs to `contexts/runs/<runId>.json`.
+- [x] Persist run context bundles to `contexts/runs/<runId>.json`.
 - [x] Persist project context bundles to `contexts/projects/<owner>__<repo>/*` only when state fingerprints change.
 - [ ] Add local replay command that reads a stored context bundle and re-runs LLM synthesis.
 - [ ] Add comparison workflow for multiple agents/models over the same stored context.
