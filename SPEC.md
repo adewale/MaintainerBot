@@ -7,10 +7,11 @@ The concise evolving spec is `docs/LIVING_SPEC.md`. This file records the curren
 ## Goals
 
 - Only consider repositories changed since `2025-11-17T00:00:00.000Z`.
-- Gather deterministic GitHub/R2 facts before calling the LLM.
+- Gather deterministic GitHub/R2 facts before any LLM call.
 - Use project state fingerprints to skip unchanged project context rebuilds.
 - Store durable context bundles and audit outputs in R2 for replay.
-- Call an LLM on every successful invocation to synthesize the daily handoff.
+- Emit a useful context-only surface audit when no LLM is configured.
+- Use an LLM for changed-project audits and final synthesis when configured.
 - Publish an action-first living status page.
 - Never mutate GitHub.
 
@@ -46,14 +47,21 @@ https://maintainerbot-status.adewale-883.workers.dev
 https://pub-39149b57d8394ddea78c0ca9f90e087f.r2.dev/MaintainerBotOut.md
 ```
 
-## Required configuration
+## Configuration
+
+Required for protected scheduled operation:
 
 ```txt
 MAINTAINERBOT_WEBHOOK_SECRET  # protects webhook
+```
+
+Optional but recommended for synthesized recommendations:
+
+```txt
 ANTHROPIC_API_KEY | OPENAI_API_KEY | OPENROUTER_API_KEY
 ```
 
-Optional:
+Other optional settings:
 
 ```txt
 GITHUB_TOKEN                  # read-only preferred, for rate limits/private visibility
@@ -74,9 +82,10 @@ GitHub Actions or manual caller
   → compute project state fingerprints
   → reuse unchanged project context bundles
   → rebuild changed project context bundles
-  → run per-project LLM audits for changed contexts
+  → if model configured, run per-project LLM audits for changed contexts
   → build run context bundle
-  → run LLM synthesis for final handoff
+  → if model configured, run LLM synthesis for final handoff
+  → otherwise emit context-only surface audit
   → write reports/context/audits to R2
 ```
 

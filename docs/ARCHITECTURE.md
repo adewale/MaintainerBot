@@ -13,7 +13,7 @@ The agent:
 3. Scans GitHub repositories, issues, and PRs.
 4. Builds deterministic recommendations with stable fingerprints.
 5. Builds per-project context, including repo health, issues, PRs, deterministic findings, and root TODO files.
-6. Calls an LLM on every successful run to synthesize the final handoff from deterministic facts.
+6. Calls an LLM to synthesize the final handoff when model credentials are configured; otherwise emits a context-only surface audit.
 7. Writes the living status page, latest aliases, audit ledgers, and historic reports to R2.
 8. Optionally sends email via Cloudflare Email Routing, though email is not a current priority.
 
@@ -62,7 +62,7 @@ docs/CONTEXT.md
 
 ## LLM context
 
-MaintainerBot requires LLM credentials. The agent always calls an LLM to synthesize the daily handoff from deterministic surface-audit facts. It computes state/input hashes for each project and only sends changed project bundles to per-project LLM audits. Each context includes repository metadata, health signals, open TODOs from root TODO files, open issues, open PRs, and deterministic findings. Secrets are not included.
+With LLM credentials, the agent calls an LLM to synthesize the daily handoff from deterministic surface-audit facts. Without LLM credentials, it still builds/reuses context bundles and publishes a degraded context-only report. It computes state/input hashes for each project and only sends changed project bundles to per-project LLM audits when a model is configured. Each context includes repository metadata, health signals, open TODOs from root TODO files, open issues, open PRs, and deterministic findings. Secrets are not included.
 
 LLM audit history is stored in R2:
 

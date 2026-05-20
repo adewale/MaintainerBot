@@ -9,8 +9,8 @@ MaintainerBot is a read-only daily maintenance handoff for Adewale's public open
 - Reads open issues, open PRs, root TODO files, and repo health signals.
 - Stores reports, lessons, rejections, and LLM audit history in R2.
 - Publishes a living Markdown/HTML status page.
-- Requires LLM credentials and calls an LLM on every successful invocation.
-- Runs changed-project-only per-project LLM audits, then always runs a final LLM synthesis of the daily handoff.
+- Emits a degraded context-only surface audit when no LLM key is configured.
+- With LLM credentials, runs changed-project-only per-project audits, then runs a final LLM synthesis of the daily handoff.
 - Never mutates GitHub.
 
 ## Next milestones

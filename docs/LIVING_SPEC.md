@@ -9,9 +9,9 @@ Each run:
 1. Reads GitHub/R2 facts with deterministic code.
 2. Uses cheap project fingerprints to skip unchanged project context rebuilds.
 3. Stores durable context bundles in R2.
-4. Calls the LLM for changed project audits.
-5. Always calls the LLM once to synthesize the daily handoff.
-6. Publishes the living status page from deterministic facts plus latest audits.
+4. Emits a context-only surface audit if no LLM is configured.
+5. If an LLM is configured, audits changed project bundles and synthesizes the daily handoff.
+6. Publishes the living status page from deterministic facts, loaded context, and latest audits.
 
 MaintainerBot must not mutate GitHub: no branches, commits, PRs, comments, labels, issue edits, releases, or repository settings changes. A GitHub token, if used, should be read-only.
 

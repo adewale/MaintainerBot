@@ -132,12 +132,27 @@ type RunContextBundle = {
 	latestProjectAudits: ProjectAudit[];
 };
 
+type ContextSummary = {
+	llmConfigured: boolean;
+	rebuiltContextBundles: string[];
+	reusedContextBundles: string[];
+	projectsWithTodos: Array<{ repo: string; todos: string[] }>;
+	healthGaps: {
+		missingDescription: string[];
+		missingLicense: string[];
+		missingCi: string[];
+		missingTests: string[];
+	};
+	projectContextRefs: Array<{ repo: string; inputHash: string; stateFingerprint: string; rebuiltThisRun: boolean; r2Key: string }>;
+};
+
 type MaintenanceReport = {
 	ok: true;
-	mode: 'llm-assisted';
+	mode: 'llm-assisted' | 'context-only-no-model';
 	runId: string;
 	promptVersion: string;
 	model: string;
+	contextSummary: ContextSummary;
 	owner: string;
 	repoCount: number;
 	summary: string;
@@ -258,15 +273,12 @@ export default async function ({ init, env, payload }: FlueContext) {
 		new Bash({ fs, cwd: '/workspace', python: true, network: { dangerouslyAllowFullInternetAccess: true } });
 
 	const hasLlmCredentials = Boolean(env.ANTHROPIC_API_KEY || env.OPENAI_API_KEY || env.OPENROUTER_API_KEY);
-	if (!hasLlmCredentials) {
-		return { ok: false, error: 'MaintainerBot requires LLM credentials. Configure ANTHROPIC_API_KEY, OPENAI_API_KEY, or OPENROUTER_API_KEY.' };
-	}
-	const model = String(env.FLUE_MODEL || defaultModel(env));
+	const model = hasLlmCredentials ? String(env.FLUE_MODEL || defaultModel(env)) : 'none';
 	const useCloudflareAiGateway = Boolean(env.CLOUDFLARE_ACCOUNT_ID && env.CF_AI_GATEWAY_ID && env.ANTHROPIC_API_KEY);
 	const agent = await init({
 		sandbox,
 		cwd: '/workspace',
-		model,
+		model: hasLlmCredentials ? model : false,
 		providers: useCloudflareAiGateway
 			? {
 					anthropic: {
@@ -329,39 +341,43 @@ export default async function ({ init, env, payload }: FlueContext) {
 		generatedAt,
 	});
 
-	const llmAudits = await auditChangedProjects({
-		bucket: reportsBucket,
-		session,
-		projectContexts,
-		rejected,
-		lessons,
-		generatedAt,
-		model,
-	});
+	const llmAudits = hasLlmCredentials
+		? await auditChangedProjects({
+				bucket: reportsBucket,
+				session,
+				projectContexts,
+				rejected,
+				lessons,
+				generatedAt,
+				model,
+			})
+		: await loadExistingProjectAudits(reportsBucket, projectContexts, generatedAt);
 	const auditRecommendations = llmAudits.results.flatMap((audit) => audit.recommendations).filter((item) => !rejected.has(item.fingerprint));
+	const contextSummary = buildContextSummary({ repos, projectContexts, prepared, llmConfigured: hasLlmCredentials });
 	const runContext = buildRunContextBundle({ runId, generatedAt, owner, cutoff, model, repos, issues, pullRequests, deterministic, projectContexts, llmAudits });
 	if (reportsBucket) await writeRunContextBundle(reportsBucket, runContext);
-	const llmReport = await synthesizeRunReport(session, runContext, rejected, lessons);
-	const llmProjectRecommendations = llmReport.projectRecommendations.filter((item) => !rejected.has(item.fingerprint));
-	const manualActionCandidates = llmReport.draftPrCandidates.filter((item) => !rejected.has(item.fingerprint));
+	const llmReport = hasLlmCredentials ? await synthesizeRunReport(session, runContext, rejected, lessons) : null;
+	const llmProjectRecommendations = llmReport?.projectRecommendations.filter((item) => !rejected.has(item.fingerprint)) ?? [];
+	const manualActionCandidates = llmReport?.draftPrCandidates.filter((item) => !rejected.has(item.fingerprint)) ?? [];
 	const mergedRecommendations = [...llmProjectRecommendations, ...auditRecommendations, ...deterministic.recommendations];
 
 	const report: MaintenanceReport = {
 		ok: true,
-		mode: 'llm-assisted',
+		mode: hasLlmCredentials ? 'llm-assisted' : 'context-only-no-model',
 		runId,
-		promptVersion: RUN_SYNTHESIS_PROMPT_VERSION,
+		promptVersion: hasLlmCredentials ? RUN_SYNTHESIS_PROMPT_VERSION : 'no-llm-context-summary-v1',
 		model,
+		contextSummary,
 		owner,
 		repoCount: repos.length,
 		generatedAt,
 		...deterministic,
-		summary: llmReport.summary,
-		priorityActions: llmReport.priorityActions,
+		summary: llmReport?.summary ?? `LLM is not configured. Built and stored ${projectContexts.length} project context bundle(s); showing deterministic facts and context summary only.`,
+		priorityActions: llmReport?.priorityActions ?? deterministic.priorityActions.filter((action) => /issue|PR|TODO|failed|stale/i.test(action)),
 		recommendations: mergedRecommendations,
 		projectRecommendations: [...llmProjectRecommendations, ...auditRecommendations],
-		draftPrCandidates: manualActionCandidates,
-		sharedLessons: llmReport.sharedLessons,
+		draftPrCandidates: hasLlmCredentials ? manualActionCandidates : [],
+		sharedLessons: llmReport?.sharedLessons ?? deterministic.sharedLessons,
 		llmAudits,
 	};
 
@@ -401,7 +417,7 @@ async function fetchOpenTodos(fullName: string, headers: Record<string, string>)
 		const file = await ghOptional(`https://api.github.com/repos/${fullName}/contents/${path}`, headers);
 		if (file?.content) {
 			try {
-				return atob(String(file.content).replace(/\n/g, ''))
+				return decodeBase64Text(String(file.content).replace(/\n/g, ''))
 					.split(/\r?\n/)
 					.map((line) => line.trim())
 					.filter((line) => /^[-*]?\s*\[?\s*\]?\s*(TODO|todo|[/-])/.test(line) || line.startsWith('- [ ]'))
@@ -412,6 +428,13 @@ async function fetchOpenTodos(fullName: string, headers: Record<string, string>)
 		}
 	}
 	return [];
+}
+
+function decodeBase64Text(value: string) {
+	const binary = atob(value);
+	const bytes = new Uint8Array(binary.length);
+	for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+	return new TextDecoder().decode(bytes);
 }
 
 async function fetchRepoHealth(fullName: string, headers: Record<string, string>): Promise<RepoHealth> {
@@ -631,7 +654,7 @@ function buildRunContextBundle(options: {
 	repos: RepoSummary[];
 	issues: WorkItem[];
 	pullRequests: WorkItem[];
-	deterministic: Omit<MaintenanceReport, 'ok' | 'mode' | 'runId' | 'promptVersion' | 'model' | 'owner' | 'repoCount' | 'generatedAt' | 'r2' | 'llmAudits'>;
+	deterministic: Omit<MaintenanceReport, 'ok' | 'mode' | 'runId' | 'promptVersion' | 'model' | 'contextSummary' | 'owner' | 'repoCount' | 'generatedAt' | 'r2' | 'llmAudits'>;
 	projectContexts: ProjectContext[];
 	llmAudits: AuditRunSummary;
 }): RunContextBundle {
@@ -686,6 +709,48 @@ If evidence is weak, recommend investigation rather than action.
 Return concise, actionable recommendations with stable fingerprints and evidence.`,
 		{ role: 'maintainer', result: ReportSchema },
 	);
+}
+
+function buildContextSummary(options: { repos: RepoSummary[]; projectContexts: ProjectContext[]; prepared: PreparedContexts; llmConfigured: boolean }): ContextSummary {
+	return {
+		llmConfigured: options.llmConfigured,
+		rebuiltContextBundles: options.prepared.rebuilt,
+		reusedContextBundles: options.prepared.reused,
+		projectsWithTodos: options.repos
+			.filter((repo) => repo.openTodos.length > 0)
+			.map((repo) => ({ repo: repo.fullName, todos: repo.openTodos.slice(0, 5) })),
+		healthGaps: {
+			missingDescription: options.repos.filter((repo) => !repo.description).map((repo) => repo.fullName),
+			missingLicense: options.repos.filter((repo) => !repo.health.hasLicense).map((repo) => repo.fullName),
+			missingCi: options.repos.filter((repo) => repo.health.hasPackageJson && !repo.health.hasCi).map((repo) => repo.fullName),
+			missingTests: options.repos.filter((repo) => repo.health.hasPackageJson && !repo.health.hasTests).map((repo) => repo.fullName),
+		},
+		projectContextRefs: options.projectContexts.map((context) => ({
+			repo: context.repo,
+			inputHash: context.inputHash,
+			stateFingerprint: context.stateFingerprint,
+			rebuiltThisRun: context.rebuiltThisRun,
+			r2Key: `contexts/projects/${context.repo.replace('/', '__')}/latest.json`,
+		})),
+	};
+}
+
+async function loadExistingProjectAudits(bucket: R2BucketLike | undefined, projectContexts: ProjectContext[], generatedAt: string): Promise<AuditRunSummary> {
+	if (!bucket) return { audited: [], carriedForward: [], skipped: projectContexts.map((project) => project.repo), results: [] };
+	const results: ProjectAudit[] = [];
+	const carriedForward: string[] = [];
+	const skipped: string[] = [];
+	for (const project of projectContexts) {
+		const key = `audits/projects/${project.repo.replace('/', '__')}/latest.json`;
+		const audit = await readJson<ProjectAudit>(bucket, key);
+		if (audit) {
+			results.push(audit);
+			carriedForward.push(project.repo);
+		} else {
+			skipped.push(project.repo);
+		}
+	}
+	return { audited: [], carriedForward, skipped, results };
 }
 
 async function auditChangedProjects(options: {
@@ -828,7 +893,11 @@ function renderMarkdown(report: MaintenanceReport) {
 	const sortedCandidates = [...report.draftPrCandidates].sort(compareRecommendations);
 	const inbox = buildActionInbox(sortedIssues, sortedPrs, sortedCandidates);
 	const actionInbox = inbox.map((item, index) => `${index + 1}. ${item}`).join('\n\n') || 'No urgent actions today.';
-	const auditSummary = renderAuditSummary(report.llmAudits);
+	const modeNotice = report.mode === 'context-only-no-model'
+		? `\n> **LLM not configured.** This is a degraded surface-audit report. MaintainerBot still built/reused context bundles and emitted deterministic facts, but no LLM synthesized recommendations.\n`
+		: '';
+	const contextMd = renderContextSummary(report.contextSummary);
+	const auditSummary = renderAuditSummary(report.llmAudits, report.mode);
 	const candidates = sortedCandidates
 		.map(
 			(pr, index) =>
@@ -842,13 +911,21 @@ function renderMarkdown(report: MaintenanceReport) {
 	const efficiency = report.efficiency.map((item) => `- ${linkRepoInText(item)}`).join('\n') || '- No efficiency findings.';
 	const codeQuality = report.codeQuality.map((item) => `- ${linkRepoInText(item)}`).join('\n') || '- No code-quality findings.';
 	const lessons = report.sharedLessons.map((lesson) => `- ${lesson}`).join('\n') || '- No shared lessons.';
-	return `# MaintainerBot Status\n\nLast updated: ${report.generatedAt}\n\n## Action inbox\n\n${actionInbox}\n\n## LLM audit status\n\n${auditSummary}\n\n## Manual action candidates\n\nMaintainerBot is read-only; these are suggestions for a human to apply.\n\n${candidates}\n\n## Open PRs needing review\n\n${prMd}\n\n## Open issues needing triage\n\n${issueMd}\n\n## Repo health fixes\n\n### Best practices\n\n${bestPractices}\n\n### Efficiency\n\n${efficiency}\n\n### Code quality\n\n${codeQuality}\n\n## Summary\n\n${report.summary}\n\n- Owner: ${report.owner}\n- Mode: ${report.mode}\n- Repositories scanned: ${report.repoCount}\n- Open issues: ${report.issues.length}\n- Open PRs: ${report.pullRequests.length}\n\n## Read-only mutation status\n\n${created}\n\n## Shared lessons\n\n${lessons}\n`;
+	return `# MaintainerBot Status\n\nLast updated: ${report.generatedAt}\n${modeNotice}\n## Action inbox\n\n${actionInbox}\n\n## Loaded context\n\n${contextMd}\n\n## LLM audit status\n\n${auditSummary}\n\n## Manual action candidates\n\nMaintainerBot is read-only; these are suggestions for a human to apply.\n\n${candidates}\n\n## Open PRs needing review\n\n${prMd}\n\n## Open issues needing triage\n\n${issueMd}\n\n## Repo health fixes\n\n### Best practices\n\n${bestPractices}\n\n### Efficiency\n\n${efficiency}\n\n### Code quality\n\n${codeQuality}\n\n## Summary\n\n${report.summary}\n\n- Owner: ${report.owner}\n- Mode: ${report.mode}\n- Run ID: ${report.runId}\n- Model: ${report.model}\n- Repositories scanned: ${report.repoCount}\n- Open issues: ${report.issues.length}\n- Open PRs: ${report.pullRequests.length}\n\n## Read-only mutation status\n\n${created}\n\n## Shared lessons\n\n${lessons}\n`;
 }
 
-function renderAuditSummary(audits: AuditRunSummary) {
-	const audited = audits.audited.length ? audits.audited.map((repo) => `- Audited: [${repo}](https://github.com/${repo})`).join('\n') : '- No projects needed a fresh LLM audit.';
+function renderContextSummary(summary: ContextSummary) {
+	const todos = summary.projectsWithTodos.length
+		? summary.projectsWithTodos.map((project) => `- [${project.repo}](https://github.com/${project.repo}): ${project.todos.slice(0, 3).join('; ')}`).join('\n')
+		: '- No root TODO items found in loaded context.';
+	const refs = summary.projectContextRefs.slice(0, 12).map((ref) => `- [${ref.repo}](https://github.com/${ref.repo}) — ${ref.rebuiltThisRun ? 'rebuilt' : 'reused'} context, input \`${ref.inputHash.slice(0, 12)}\``).join('\n') || '- No project context refs.';
+	return `- LLM configured: ${summary.llmConfigured ? 'yes' : 'no'}\n- Context bundles rebuilt: ${summary.rebuiltContextBundles.length}\n- Context bundles reused: ${summary.reusedContextBundles.length}\n- Projects with root TODOs: ${summary.projectsWithTodos.length}\n- Missing descriptions: ${summary.healthGaps.missingDescription.length}\n- Missing licenses: ${summary.healthGaps.missingLicense.length}\n- Package repos missing CI: ${summary.healthGaps.missingCi.length}\n- Package repos missing tests/check scripts: ${summary.healthGaps.missingTests.length}\n\n### TODO-backed context\n\n${todos}\n\n### Project context refs\n\n${refs}`;
+}
+
+function renderAuditSummary(audits: AuditRunSummary, mode: MaintenanceReport['mode']) {
+	const audited = audits.audited.length ? audits.audited.map((repo) => `- Audited: [${repo}](https://github.com/${repo})`).join('\n') : mode === 'llm-assisted' ? '- No projects needed a fresh LLM audit.' : '- No fresh LLM audits ran because no model is configured.';
 	const carried = audits.carriedForward.length ? audits.carriedForward.map((repo) => `- Carried forward: [${repo}](https://github.com/${repo})`).join('\n') : '- No carried-forward audits.';
-	const skipped = audits.skipped.length ? `- Skipped ${audits.skipped.length} project(s) because R2 audit persistence was unavailable.` : '- No projects skipped.';
+	const skipped = audits.skipped.length ? mode === 'llm-assisted' ? `- Skipped ${audits.skipped.length} project(s) because R2 audit persistence was unavailable.` : `- No previous LLM audit found for ${audits.skipped.length} project(s). Configure a model key to generate audits.` : '- No projects skipped.';
 	return `${audited}\n${carried}\n${skipped}`;
 }
 

@@ -119,9 +119,9 @@ EMAIL_DRY_RUN=false
 
 If `EMAIL_DRY_RUN=true`, `EMAIL_TO`/`EMAIL_FROM` are missing, or the `SEND_EMAIL` binding is unavailable, no email is sent.
 
-## Required LLM credentials
+## Optional LLM credentials
 
-Every successful MaintainerBot invocation calls an LLM after deterministic scanning. Configure at least one model provider secret before deploying/running:
+Without an LLM provider key, MaintainerBot still builds/reuses context bundles and publishes a degraded surface-audit report. Configure at least one model provider secret to get synthesized recommendations:
 
 ```bash
 pnpm exec wrangler secret put ANTHROPIC_API_KEY
@@ -131,7 +131,7 @@ pnpm exec wrangler secret put OPENAI_API_KEY
 pnpm exec wrangler secret put OPENROUTER_API_KEY
 ```
 
-Without a provider key, the Worker returns a configuration error instead of producing a deterministic-only report.
+Without a provider key, the Worker reports `context-only-no-model` mode and skips LLM recommendations.
 
 ## GitHub write operations
 
