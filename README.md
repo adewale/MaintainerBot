@@ -1,155 +1,111 @@
 # MaintainerBot
 
-MaintainerBot is a Flue project for daily maintenance of Adewale's open-source projects.
+MaintainerBot is a read-only Flue maintenance bot for my public open-source projects. It runs daily, gathers deterministic GitHub/project facts, stores replayable context bundles in R2, and publishes an action-first handoff page.
 
-This README is the top-level intent document. The concise living spec lives in:
+If you are reading this from the “Learning Flue in 3 bots” thread, this is the third bot: a deployed, stateful Cloudflare/R2 example that is more realistic than a gist.
+
+## Best links
+
+- **Live status page:** https://maintainerbot-status.adewale-883.workers.dev/
+- **Raw Markdown output:** https://pub-39149b57d8394ddea78c0ca9f90e087f.r2.dev/MaintainerBotOut.md
+- **JSON output:** https://maintainerbot-status.adewale-883.workers.dev/json
+- **Main agent:** [`.flue/agents/daily-maintenance.ts`](.flue/agents/daily-maintenance.ts)
+- **Living spec:** [`docs/LIVING_SPEC.md`](docs/LIVING_SPEC.md)
+- **Context model:** [`docs/CONTEXT.md`](docs/CONTEXT.md)
+- **Lessons learned:** [`docs/LESSONS_LEARNED.md`](docs/LESSONS_LEARNED.md)
+
+## What it does
+
+MaintainerBot scans repositories changed since **November 17, 2025** and reports:
+
+- open issues needing triage
+- open PRs needing review
+- root TODO files
+- repo health signals: README, license, CI, package files, lockfiles, test/check scripts
+- deterministic recommendations with stable fingerprints
+- context bundle reuse/rebuild status
+- previous audit state when available
+
+It is intentionally **read-only**. It does not create branches, commits, PRs, comments, labels, issues, releases, or repository setting changes.
+
+## Why it exists
+
+This project is both useful tooling and a Flue learning artifact. It explores how to build a hosted maintenance agent that separates:
 
 ```txt
-docs/LIVING_SPEC.md
+deterministic facts → durable context bundle → bounded LLM step → published handoff
 ```
 
-The detailed technical spec lives in `SPEC.md`. Durable project lessons are captured in `docs/LESSONS_LEARNED.md`.
+The important design idea is replay: a stored context bundle can be re-evaluated later by another prompt/model/agent without hitting GitHub again.
 
-As the project evolves, update both this README and `SPEC.md` with the current product direction, safety constraints, operating assumptions, and lessons learned.
+## Current status
 
-## Current intent
-
-MaintainerBot should help me maintain my various open-source projects by scanning recently active projects every day and producing a useful maintenance report. It only includes repositories updated since November 17, 2025.
-
-Every day it should look at:
-
-- Issues
-- Pull requests
-- Best practices and lessons learned
-- Efficiency opportunities
-- Code quality opportunities
-- Shared lessons across repositories
-
-Eventually, MaintainerBot should:
-
-- Identify and verify fixes
-- Identify verification steps and manual PR candidates
-- Keep track of what I have rejected so it never repeats rejected ideas
-
-## Current operating mode
-
-For now, MaintainerBot is intentionally conservative:
-
-- It scans and reports.
-- It is read-only: no branches, commits, PRs, comments, labels, or repo settings changes.
-- It does **not** send email by default.
-- In local mode, it emits the main human-readable report to:
+The deployed bot currently runs in:
 
 ```txt
-/tmp/MaintainerBotOut.md
+context-only-no-model
 ```
 
-- It has a GitHub Actions daily schedule that invokes the protected Cloudflare webhook at 09:00 UTC.
-- In Cloudflare mode, it keeps all durable data in R2:
+That means no LLM provider key is configured in Cloudflare yet. The bot still builds/reuses context bundles and emits deterministic surface-audit facts. When an LLM key is configured, it will additionally run changed-project audits and synthesize the final handoff.
+
+## How it works
 
 ```txt
-R2 bucket: maintainerbot-data
-Binding: MAINTAINERBOT_R2
+Daily GitHub Actions schedule
+  → protected Cloudflare Worker webhook
+  → read GitHub + R2 facts
+  → compute cheap project fingerprints
+  → reuse unchanged project context bundles
+  → rebuild changed project context bundles
+  → optional LLM project audits
+  → optional LLM run synthesis
+  → write Markdown/JSON/status/context/audit artifacts to R2
 ```
 
-R2 keys:
+Durable R2 objects include:
 
 ```txt
-MaintainerBotOut.md              # latest living Markdown status page
-MaintainerBotOut.json            # latest machine-readable status
-data/rejections.json
-data/lessons.md
-reports/daily-maintenance-latest.md
-reports/daily-maintenance-latest.json
+MaintainerBotOut.md
+MaintainerBotOut.json
+contexts/index.json
+contexts/runs/<runId>.json
+contexts/projects/<owner>__<repo>/latest.json
+audits/projects/<owner>__<repo>/latest.json
 reports/history/YYYY-MM-DD/daily-maintenance.md
 reports/history/YYYY-MM-DD/daily-maintenance.json
-```
-
-The preferred interface is now the living R2 status file, `MaintainerBotOut.md`. Each run overwrites it with the effective current status of all scanned projects while still preserving dated history under `reports/history/`.
-
-Public latest status URL:
-
-```txt
-https://pub-39149b57d8394ddea78c0ca9f90e087f.r2.dev/MaintainerBotOut.md
-```
-
-Public latest JSON URL:
-
-```txt
-https://pub-39149b57d8394ddea78c0ca9f90e087f.r2.dev/MaintainerBotOut.json
-```
-
-Pretty HTML status page served by a Worker:
-
-```txt
-https://maintainerbot-status.adewale-883.workers.dev
-```
-
-Status Worker raw routes:
-
-```txt
-/raw
-/json
-/health
-```
-
-Local copies under `reports/` are for local debugging/history only.
-
-## Setup
-
-```bash
-cd /Users/adewale/Documents/projects/code/flue-onboarding/MaintainerBot
-pnpm install
-cp .env.example .env
-```
-
-Edit `.env` as needed:
-
-```bash
-GITHUB_OWNER=adewale
-GITHUB_TOKEN=...
-FLUE_MODEL=anthropic/claude-haiku-4-5
-ANTHROPIC_API_KEY=... # or OPENAI_API_KEY / OPENROUTER_API_KEY; one provider key is required
 ```
 
 ## Run locally
 
 ```bash
+pnpm install
+cp .env.example .env
 pnpm run save:daily
 ```
 
-Primary output:
+Primary local output:
 
 ```txt
 /tmp/MaintainerBotOut.md
 ```
 
-Secondary local outputs:
+## Configuration
 
-```txt
-reports/daily-maintenance.md
-reports/daily-maintenance.json
-reports/daily-maintenance-YYYY-MM-DD.md
-reports/daily-maintenance-YYYY-MM-DD.json
+Useful `.env` values:
+
+```bash
+GITHUB_OWNER=adewale
+# Optional: set GITHUB_TOKEN in .env for higher GitHub API limits.
+FLUE_MODEL=anthropic/claude-haiku-4-5
+ANTHROPIC_API_KEY=your-anthropic-key
+# or OPENAI_API_KEY / OPENROUTER_API_KEY
 ```
 
-Dated daily reports are intended to be committed so we keep report history. Mutable latest files and logs are ignored by git.
+A GitHub token is optional but recommended in production to avoid unauthenticated API rate limits. Use a read-only/least-privileged token.
 
-## Daily scheduling
+An LLM key is optional. Without it, MaintainerBot emits a degraded context-only report. With it, MaintainerBot emits LLM-synthesized recommendations.
 
-The deployed bot runs daily through:
-
-```txt
-.github/workflows/daily-maintenance.yml
-```
-
-That workflow uses the GitHub repository secret:
-
-```txt
-MAINTAINERBOT_WEBHOOK_SECRET
-```
-
-## Deploy to Cloudflare
+## Deploy
 
 Create the R2 bucket once:
 
@@ -157,22 +113,7 @@ Create the R2 bucket once:
 pnpm exec wrangler r2 bucket create maintainerbot-data
 ```
 
-Build and deploy:
-
-```bash
-pnpm run deploy:cloudflare
-```
-
-Invoke the deployed agent with the protected webhook secret:
-
-```bash
-SECRET=$(cat .webhook-secret)
-curl -X POST https://maintainerbot.<your-subdomain>.workers.dev/agents/daily-maintenance/daily \
-  -H 'Content-Type: application/json' \
-  -d "{\"webhookSecret\":\"$SECRET\"}"
-```
-
-Set secrets when needed:
+Set secrets:
 
 ```bash
 pnpm exec wrangler secret put MAINTAINERBOT_WEBHOOK_SECRET
@@ -180,52 +121,67 @@ pnpm exec wrangler secret put GITHUB_TOKEN
 pnpm exec wrangler secret put ANTHROPIC_API_KEY # or OPENAI_API_KEY / OPENROUTER_API_KEY
 ```
 
-## Safety
+Deploy the main Worker:
 
-MaintainerBot is read-only. It may use an optional read-only GitHub token for higher API limits/private visibility, but it must not create branches, commits, PRs, comments, labels, issues, or repository setting changes.
-
-Rejected ideas should be tracked in:
-
-```txt
-data/rejections.json
+```bash
+pnpm run deploy:cloudflare
 ```
 
-Shared lessons should be tracked in:
+Deploy the status Worker:
 
-```txt
-data/lessons.md
+```bash
+pnpm run deploy:status
 ```
 
-## Webhook security
+Invoke manually:
 
-The Cloudflare webhook is protected by a shared secret:
-
-```txt
-MAINTAINERBOT_WEBHOOK_SECRET
+```bash
+curl -X POST https://maintainerbot.<your-subdomain>.workers.dev/agents/daily-maintenance/daily \
+  -H 'Content-Type: application/json' \
+  -d '{"webhookSecret":"..."}'
 ```
 
-The source code can be public because it only contains the check, not the secret value. The real secret lives in Cloudflare Worker secrets and local ignored files such as `.webhook-secret` or `.env`.
+## Safety model
 
-An attacker can see that a secret is required, but cannot run the job without knowing the secret value.
+- public source contains no secrets
+- webhook requires `MAINTAINERBOT_WEBHOOK_SECRET`
+- GitHub access should be read-only
+- all durable bot state lives in R2
+- LLM context never includes secrets
+- recommendations are human handoff only
 
-## Secret hygiene
-
-Before committing or pushing, run:
+Before pushing:
 
 ```bash
 pnpm run check:secrets
+pnpm run test:rejections
+pnpm run build:cloudflare
 ```
 
-Rules:
+## Project map
 
-- Never commit `.env` or `.env.*` files.
-- Keep real tokens only in local env vars, GitHub Secrets, or deployment secrets.
-- Commit only placeholders in `.env.example`.
-- If a real secret is ever committed, rotate it immediately.
+```txt
+.flue/agents/daily-maintenance.ts    main hosted Flue agent
+.flue/agents/deep-verify.ts          CLI-only future verifier scaffold
+workers/status.ts                    pretty status-page Worker
+docs/LIVING_SPEC.md                  concise intent
+docs/CONTEXT.md                      replayable context bundle model
+docs/LESSONS_LEARNED.md              design lessons
+docs/OPERATIONS.md                   operating notes
+SPEC.md                              implementation contract
+TODO.md                              remaining work
+```
 
-## Evolving intent log
+## For the tweet
 
-Add notes here when the intent changes.
+Best place to point people:
 
-- Initial intent: daily open-source maintenance assistant that scans projects, recommends fixes, eventually drafts PRs, emails results, and remembers rejected ideas.
-- Current constraint: emit reports only; no PR creation or email sending yet.
+```txt
+https://github.com/adewale/MaintainerBot
+```
+
+Best place to show the live bot output:
+
+```txt
+https://maintainerbot-status.adewale-883.workers.dev/
+```
