@@ -8,7 +8,7 @@ This README is the top-level intent document. The concise living spec lives in:
 docs/LIVING_SPEC.md
 ```
 
-The detailed technical spec lives in `SPEC.md`.
+The detailed technical spec lives in `SPEC.md`. Durable project lessons are captured in `docs/LESSONS_LEARNED.md`.
 
 As the project evolves, update both this README and `SPEC.md` with the current product direction, safety constraints, operating assumptions, and lessons learned.
 

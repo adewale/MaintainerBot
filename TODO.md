@@ -88,4 +88,5 @@ Deferred work and future milestones.
 
 - [x] Add concise living spec in `docs/LIVING_SPEC.md`.
 - [x] Document CLI-only opportunities and Astro lessons.
+- [x] Capture MaintainerBot lessons learned in `docs/LESSONS_LEARNED.md`.
 - [x] Document safety boundaries and secret handling.
