@@ -104,6 +104,12 @@ export default async function videoConvert({ init, env, payload, id }: FlueConte
       generatedAt: new Date().toISOString(),
     };
 
+    const fakeConvertedBytes = new TextEncoder().encode(
+      `MOCK ${format.toUpperCase()} for ${args.inputKey} at maxHeight=${args.maxHeight ?? 'original'}\n`,
+    );
+    await bucket.put(args.outputKey, fakeConvertedBytes, {
+      httpMetadata: { contentType: format === 'webm' ? 'video/webm' : 'video/mp4' },
+    });
     await bucket.put(args.outputKey.replace(/\.[^.]+$/, '.conversion.json'), JSON.stringify(result, null, 2), {
       httpMetadata: { contentType: 'application/json' },
     });
@@ -305,6 +311,28 @@ Why this works:
 5. Swapping Just Bash for a real sandbox changes execution power, not the Flue/R2 contract.
 
 ---
+
+## Local verification
+
+This repo includes a local test that shims R2 with a folder and uses Just Bash as the pseudo-sandbox:
+
+```bash
+pnpm run test:mediabunny:gist
+```
+
+The test writes a gist-ready result file:
+
+```txt
+docs/gists/mediabunny-flue-video-conversion.local-test-results.md
+```
+
+It verifies:
+
+- generated fake input media is stored in the local R2 shim
+- an outbound Worker-style `GET /in/<key>` reads from the shim
+- an outbound Worker-style `PUT /out/<key>` writes to the shim
+- a Just Bash pseudo-sandbox runs the mocked conversion step
+- output and conversion metadata are written back through the R2-shaped contract
 
 ## Example payload
 

@@ -14,6 +14,7 @@
     "save:daily": "node scripts/run-daily.mjs",
     "reject": "node scripts/reject.mjs",
     "test:rejections": "node scripts/test-rejections.mjs",
+    "test:mediabunny:gist": "node scripts/test-mediabunny-video-convert-local.mjs",
     "check:secrets": "node scripts/check-secrets.mjs"
   },
   "dependencies": {

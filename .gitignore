@@ -5,6 +5,7 @@ node_modules
 .webhook-secret
 dist
 .wrangler
+.tmp
 .DS_Store
 
 # Logs can contain raw command output; do not commit them.
