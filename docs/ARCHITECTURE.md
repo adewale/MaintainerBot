@@ -1,12 +1,12 @@
 # MaintainerBot Architecture
 
-## Core Flue agent
+## Core Flue workflow
 
 ```txt
-.flue/agents/daily-maintenance.ts
+.flue/workflows/daily-maintenance.ts
 ```
 
-The agent:
+The workflow:
 
 1. Validates the protected webhook secret.
 2. Loads durable memory from R2.
@@ -46,9 +46,9 @@ reports/history/YYYY-MM-DD/daily-maintenance.json
 
 ## Runtime
 
-The daily agent uses a lightweight `just-bash` sandbox for local scratch files. GitHub API calls happen from trusted runtime code with secrets in env, not from prompts.
+The daily workflow uses a lightweight `just-bash` sandbox for local scratch files. GitHub API calls happen from trusted runtime code with secrets in env, not from prompts.
 
-CLI-only agents are used for heavyweight read-only workflows. `deep-verify` clones changed repos into temporary local sandboxes, runs safe allowlisted verification commands, and summarizes evidence without mutating GitHub.
+CLI-only workflows are used for heavyweight read-only verification. `deep-verify` clones changed repos with a `local()` host sandbox, runs safe read-only verification commands planned by the `deep-verify-plan` skill, and summarizes evidence with the `deep-verify-summarize` skill without mutating GitHub.
 
 ## Context bundles
 

@@ -1,3 +1,8 @@
+---
+name: deep-verify-summarize
+description: Summarize a read-only verification run into a structured status with evidence-backed findings.
+---
+
 # Deep verification summary
 
 Summarize the read-only verification run.

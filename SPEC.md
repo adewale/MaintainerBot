@@ -27,10 +27,10 @@ Later phases may add read-only checkout/eval/coding-agent workflows, but those p
 
 ## Runtime
 
-Main agent:
+Main workflow:
 
 ```txt
-.flue/agents/daily-maintenance.ts
+.flue/workflows/daily-maintenance.ts
 ```
 
 Public status Worker:

@@ -1,8 +1,29 @@
-import type { FlueContext } from '@flue/sdk/client';
+import { configureProvider, createAgent, type FlueContext, type WorkflowRouteHandler } from '@flue/runtime';
 import { Bash, InMemoryFs } from 'just-bash';
 import * as v from 'valibot';
 
-export const triggers = { webhook: true };
+// Exposing the workflow over HTTP (replaces the old `triggers = { webhook: true }`).
+// The webhook POST body becomes the workflow `payload`.
+export const route: WorkflowRouteHandler = async (_c, next) => next();
+
+// Conservative open-source maintenance reviewer persona. Previously the
+// `.flue/roles/maintainer.md` role; roles were removed in Flue 0.9, so the
+// guidance now ships as agent-wide `instructions`.
+const MAINTAINER_INSTRUCTIONS = `You are a senior open-source maintainer. Prioritize high-signal, low-risk improvements.
+
+Review categories:
+- Issues
+- Pull requests
+- Best practices and lessons learned
+- Efficiency
+- Code quality
+- Shared lessons across repositories
+
+Rules:
+- Do not repeat rejected ideas.
+- Prefer small draft PRs over large rewrites.
+- Verify fixes with tests, builds, or clear static checks.
+- If evidence is weak, recommend investigation instead of making a change.`;
 
 type RepoHealth = {
 	hasReadme: boolean;
@@ -264,7 +285,7 @@ function defaultModel(env: Record<string, any>) {
 	return 'anthropic/claude-haiku-4-5';
 }
 
-export default async function ({ init, env, payload }: FlueContext) {
+export async function run({ init, env, payload }: FlueContext) {
 	const configuredSecret = env.MAINTAINERBOT_WEBHOOK_SECRET;
 	if (configuredSecret && payload?.webhookSecret !== configuredSecret) return { ok: false, error: 'Unauthorized' };
 
@@ -275,21 +296,22 @@ export default async function ({ init, env, payload }: FlueContext) {
 	const hasLlmCredentials = Boolean(env.ANTHROPIC_API_KEY || env.OPENAI_API_KEY || env.OPENROUTER_API_KEY);
 	const model = hasLlmCredentials ? String(env.FLUE_MODEL || defaultModel(env)) : 'none';
 	const useCloudflareAiGateway = Boolean(env.CLOUDFLARE_ACCOUNT_ID && env.CF_AI_GATEWAY_ID && env.ANTHROPIC_API_KEY);
-	const agent = await init({
+	// Provider transport settings moved from init({ providers }) to configureProvider() in Flue 0.9.
+	if (useCloudflareAiGateway) {
+		configureProvider('anthropic', {
+			baseUrl: `https://gateway.ai.cloudflare.com/v1/${env.CLOUDFLARE_ACCOUNT_ID}/${env.CF_AI_GATEWAY_ID}/anthropic`,
+			apiKey: env.ANTHROPIC_API_KEY,
+			headers: env.CF_AI_GATEWAY_TOKEN ? { 'cf-aig-authorization': `Bearer ${env.CF_AI_GATEWAY_TOKEN}` } : undefined,
+		});
+	}
+	const agent = createAgent(() => ({
 		sandbox,
 		cwd: '/workspace',
 		model: hasLlmCredentials ? model : false,
-		providers: useCloudflareAiGateway
-			? {
-					anthropic: {
-						baseUrl: `https://gateway.ai.cloudflare.com/v1/${env.CLOUDFLARE_ACCOUNT_ID}/${env.CF_AI_GATEWAY_ID}/anthropic`,
-						apiKey: env.ANTHROPIC_API_KEY,
-						headers: env.CF_AI_GATEWAY_TOKEN ? { 'cf-aig-authorization': `Bearer ${env.CF_AI_GATEWAY_TOKEN}` } : undefined,
-					},
-				}
-			: undefined,
-	});
-	const session = await agent.session();
+		instructions: MAINTAINER_INSTRUCTIONS,
+	}));
+	const harness = await init(agent);
+	const session = await harness.session();
 
 	const owner = String(env.GITHUB_OWNER || 'adewale');
 	const reportsBucket = env.MAINTAINERBOT_R2 as R2BucketLike | undefined;
@@ -690,7 +712,7 @@ async function writeRunContextBundle(bucket: R2BucketLike, bundle: RunContextBun
 }
 
 async function synthesizeRunReport(session: any, bundle: RunContextBundle, rejected: Set<string>, lessons: string) {
-	return session.prompt(
+	const { data } = await session.prompt(
 		`Create today's read-only MaintainerBot handoff from this stored run context bundle.
 
 Run context bundle JSON:
@@ -707,8 +729,9 @@ MaintainerBot is read-only: do not claim it created branches, commits, PRs, comm
 Lean on deterministic findings and latest project audits. Rank the human handoff by evidence, urgency, and likely impact.
 If evidence is weak, recommend investigation rather than action.
 Return concise, actionable recommendations with stable fingerprints and evidence.`,
-		{ role: 'maintainer', result: ReportSchema },
+		{ result: ReportSchema },
 	);
+	return data;
 }
 
 function buildContextSummary(options: { repos: RepoSummary[]; projectContexts: ProjectContext[]; prepared: PreparedContexts; llmConfigured: boolean }): ContextSummary {
@@ -791,7 +814,7 @@ async function auditChangedProjects(options: {
 			}
 		}
 
-		const audit = await options.session.prompt(
+		const { data: audit } = await options.session.prompt(
 			`You are MaintainerBot auditing one repository.
 
 Use only the supplied project context. Do not invent files, issues, PRs, or TODOs.
@@ -806,7 +829,7 @@ ${JSON.stringify([...options.rejected], null, 2)}
 
 Shared lessons:
 ${options.lessons}`,
-			{ role: 'maintainer', result: ProjectAuditSchema },
+			{ result: ProjectAuditSchema },
 		);
 		const normalized: ProjectAudit = {
 			repo: project.repo,
