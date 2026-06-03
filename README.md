@@ -9,7 +9,7 @@ If you are reading this from the “Learning Flue in 3 bots” thread, this is t
 - **Live status page:** https://maintainerbot-status.adewale-883.workers.dev/
 - **Raw Markdown output:** https://pub-39149b57d8394ddea78c0ca9f90e087f.r2.dev/MaintainerBotOut.md
 - **JSON output:** https://maintainerbot-status.adewale-883.workers.dev/json
-- **Main agent:** [`.flue/agents/daily-maintenance.ts`](.flue/agents/daily-maintenance.ts)
+- **Main workflow:** [`.flue/workflows/daily-maintenance.ts`](.flue/workflows/daily-maintenance.ts)
 - **Living spec:** [`docs/LIVING_SPEC.md`](docs/LIVING_SPEC.md)
 - **Context model:** [`docs/CONTEXT.md`](docs/CONTEXT.md)
 - **Lessons learned:** [`docs/LESSONS_LEARNED.md`](docs/LESSONS_LEARNED.md)
@@ -161,8 +161,8 @@ pnpm run build:cloudflare
 ## Project map
 
 ```txt
-.flue/agents/daily-maintenance.ts    main hosted Flue agent
-.flue/agents/deep-verify.ts          CLI-only future verifier scaffold
+.flue/workflows/daily-maintenance.ts main hosted Flue workflow
+.flue/workflows/deep-verify.ts       CLI-only future verifier scaffold
 workers/status.ts                    pretty status-page Worker
 docs/LIVING_SPEC.md                  concise intent
 docs/CONTEXT.md                      replayable context bundle model

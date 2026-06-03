@@ -1,3 +1,8 @@
+---
+name: deep-verify-plan
+description: Plan safe, read-only verification commands for one repository given its inventory and package.json.
+---
+
 # Deep verification plan
 
 You are planning a read-only verification run for one repository.

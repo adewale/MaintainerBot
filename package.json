@@ -9,7 +9,7 @@
     "dev:cloudflare": "flue dev --target cloudflare --env .env",
     "deploy:cloudflare": "flue build --target cloudflare --output . && wrangler deploy --config dist/wrangler.jsonc",
     "deploy:status": "wrangler deploy --config wrangler.status.jsonc",
-    "daily": "flue run daily-maintenance --target node --id daily --payload '{}' --env .env --output .",
+    "daily": "flue run daily-maintenance --target node --payload '{}' --env .env --output .",
     "deep:verify": "flue run deep-verify --target node --env .env --output .",
     "save:daily": "node scripts/run-daily.mjs",
     "reject": "node scripts/reject.mjs",
@@ -18,14 +18,14 @@
     "check:secrets": "node scripts/check-secrets.mjs"
   },
   "dependencies": {
-    "@flue/sdk": "latest",
+    "@flue/runtime": "^0.9.1",
     "agents": "^0.12.3",
     "just-bash": "^2.14.2",
     "valibot": "^1.0.0"
   },
   "devDependencies": {
-    "@flue/cli": "latest",
+    "@flue/cli": "^0.9.1",
     "typescript": "^5.9.2",
-    "wrangler": "^4.89.1"
+    "wrangler": "^4.97.0"
   }
 }
