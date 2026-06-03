@@ -35,7 +35,7 @@ function headers(env: Record<string, any>) {
 }
 
 export async function run({ init, payload, env }: FlueContext) {
-	const repo = String(payload.repo || '');
+	const repo = String(payload?.repo || '');
 	if (!/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(repo)) throw new Error('payload.repo must be owner/name');
 
 	const metadataResponse = await fetch(`https://api.github.com/repos/${repo}`, { headers: headers(env) });
