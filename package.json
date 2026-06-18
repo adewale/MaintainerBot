@@ -18,7 +18,7 @@
     "check:secrets": "node scripts/check-secrets.mjs"
   },
   "dependencies": {
-    "@flue/runtime": "1.0.0-beta.1",
+    "@flue/runtime": "1.0.0-beta.2",
     "agents": "^0.14.5",
     "just-bash": "^2.14.2",
     "valibot": "^1.0.0"
