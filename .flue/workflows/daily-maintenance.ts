@@ -1,8 +1,20 @@
-import type { FlueContext } from '@flue/sdk/client';
-import { Bash, InMemoryFs } from 'just-bash';
+import { createAgent, registerProvider, type FlueContext, type FlueSession, type WorkflowRouteHandler } from '@flue/runtime';
 import * as v from 'valibot';
 
-export const triggers = { webhook: true };
+export const route: WorkflowRouteHandler = async (c, next) => {
+	const configuredSecret = (c.env as MaintainerEnv | undefined)?.MAINTAINERBOT_WEBHOOK_SECRET;
+	if (configuredSecret) {
+		const body = await c.req.raw.clone().json().catch(() => null) as DailyPayload | null;
+		if (body?.webhookSecret !== configuredSecret) return c.json({ ok: false, error: 'Unauthorized' }, 401);
+	}
+	await next();
+};
+
+type DailyPayload = { webhookSecret?: string } | undefined;
+
+type MaintainerEnv = Record<string, any> & {
+	MAINTAINERBOT_R2?: R2BucketLike;
+};
 
 type RepoHealth = {
 	hasReadme: boolean;
@@ -264,32 +276,57 @@ function defaultModel(env: Record<string, any>) {
 	return 'anthropic/claude-haiku-4-5';
 }
 
-export default async function ({ init, env, payload }: FlueContext) {
+function hasLlmCredentials(env: Record<string, any>) {
+	return Boolean(env.ANTHROPIC_API_KEY || env.OPENAI_API_KEY || env.OPENROUTER_API_KEY);
+}
+
+function selectedModel(env: Record<string, any>) {
+	return hasLlmCredentials(env) ? String(env.FLUE_MODEL || defaultModel(env)) : 'none';
+}
+
+function configureProviderOverrides(env: Record<string, any>) {
+	if (!(env.CLOUDFLARE_ACCOUNT_ID && env.CF_AI_GATEWAY_ID && env.ANTHROPIC_API_KEY)) return;
+	registerProvider('anthropic', {
+		baseUrl: `https://gateway.ai.cloudflare.com/v1/${env.CLOUDFLARE_ACCOUNT_ID}/${env.CF_AI_GATEWAY_ID}/anthropic`,
+		apiKey: env.ANTHROPIC_API_KEY,
+		headers: env.CF_AI_GATEWAY_TOKEN ? { 'cf-aig-authorization': `Bearer ${env.CF_AI_GATEWAY_TOKEN}` } : undefined,
+	});
+}
+
+const MAINTAINER_INSTRUCTIONS = `You are a senior open-source maintainer. Prioritize high-signal, low-risk improvements.
+
+Review categories:
+- Issues
+- Pull requests
+- Best practices and lessons learned
+- Efficiency
+- Code quality
+- Shared lessons across repositories
+
+Rules:
+- Do not repeat rejected ideas.
+- Prefer small draft PRs over large rewrites.
+- Verify fixes with tests, builds, or clear static checks.
+- If evidence is weak, recommend investigation instead of making a change.`;
+
+const maintainerAgent = createAgent<DailyPayload, MaintainerEnv>(({ env }) => {
+	configureProviderOverrides(env);
+	const model = selectedModel(env);
+	return {
+		cwd: '/workspace',
+		model: model === 'none' ? false : model,
+		instructions: MAINTAINER_INSTRUCTIONS,
+	};
+});
+
+export async function run({ init, env, payload }: FlueContext<DailyPayload, MaintainerEnv>) {
 	const configuredSecret = env.MAINTAINERBOT_WEBHOOK_SECRET;
 	if (configuredSecret && payload?.webhookSecret !== configuredSecret) return { ok: false, error: 'Unauthorized' };
 
-	const fs = new InMemoryFs();
-	const sandbox = () =>
-		new Bash({ fs, cwd: '/workspace', python: true, network: { dangerouslyAllowFullInternetAccess: true } });
-
-	const hasLlmCredentials = Boolean(env.ANTHROPIC_API_KEY || env.OPENAI_API_KEY || env.OPENROUTER_API_KEY);
-	const model = hasLlmCredentials ? String(env.FLUE_MODEL || defaultModel(env)) : 'none';
-	const useCloudflareAiGateway = Boolean(env.CLOUDFLARE_ACCOUNT_ID && env.CF_AI_GATEWAY_ID && env.ANTHROPIC_API_KEY);
-	const agent = await init({
-		sandbox,
-		cwd: '/workspace',
-		model: hasLlmCredentials ? model : false,
-		providers: useCloudflareAiGateway
-			? {
-					anthropic: {
-						baseUrl: `https://gateway.ai.cloudflare.com/v1/${env.CLOUDFLARE_ACCOUNT_ID}/${env.CF_AI_GATEWAY_ID}/anthropic`,
-						apiKey: env.ANTHROPIC_API_KEY,
-						headers: env.CF_AI_GATEWAY_TOKEN ? { 'cf-aig-authorization': `Bearer ${env.CF_AI_GATEWAY_TOKEN}` } : undefined,
-					},
-				}
-			: undefined,
-	});
-	const session = await agent.session();
+	const hasModel = hasLlmCredentials(env);
+	const model = selectedModel(env);
+	const harness = await init(maintainerAgent);
+	const session = await harness.session();
 
 	const owner = String(env.GITHUB_OWNER || 'adewale');
 	const reportsBucket = env.MAINTAINERBOT_R2 as R2BucketLike | undefined;
@@ -303,9 +340,8 @@ export default async function ({ init, env, payload }: FlueContext) {
 	const lessons = await readOrSeedR2(reportsBucket, 'data/lessons.md', DEFAULT_LESSONS, 'text/markdown; charset=utf-8');
 	const rejected = rejectedFingerprints(rejections);
 
-	await session.shell('mkdir -p /workspace/data /workspace/reports');
-	await session.shell(`cat > /workspace/data/rejections.json <<'EOF'\n${rejections}\nEOF`);
-	await session.shell(`cat > /workspace/data/lessons.md <<'EOF'\n${lessons}\nEOF`);
+	await harness.fs.writeFile('/workspace/data/rejections.json', rejections);
+	await harness.fs.writeFile('/workspace/data/lessons.md', lessons);
 
 	const cutoff = DEFAULT_CUTOFF;
 	const baseRepos = (await fetchRepos(owner, githubHeaders)).filter((repo) => repo.pushedAt && repo.pushedAt >= cutoff);
@@ -327,7 +363,7 @@ export default async function ({ init, env, payload }: FlueContext) {
 		owner,
 	});
 	const repos = prepared.repos;
-	await session.shell(`cat > /workspace/reports/repo-summary.json <<'EOF'\n${JSON.stringify(repos, null, 2)}\nEOF`);
+	await harness.fs.writeFile('/workspace/reports/repo-summary.json', `${JSON.stringify(repos, null, 2)}\n`);
 	const deterministic = buildDeterministicReport(repos, issues, pullRequests, rejected);
 	const projectContexts = await finalizeProjectContexts({
 		bucket: reportsBucket,
@@ -341,7 +377,7 @@ export default async function ({ init, env, payload }: FlueContext) {
 		generatedAt,
 	});
 
-	const llmAudits = hasLlmCredentials
+	const llmAudits = hasModel
 		? await auditChangedProjects({
 				bucket: reportsBucket,
 				session,
@@ -353,19 +389,19 @@ export default async function ({ init, env, payload }: FlueContext) {
 			})
 		: await loadExistingProjectAudits(reportsBucket, projectContexts, generatedAt);
 	const auditRecommendations = llmAudits.results.flatMap((audit) => audit.recommendations).filter((item) => !rejected.has(item.fingerprint));
-	const contextSummary = buildContextSummary({ repos, projectContexts, prepared, llmConfigured: hasLlmCredentials });
+	const contextSummary = buildContextSummary({ repos, projectContexts, prepared, llmConfigured: hasModel });
 	const runContext = buildRunContextBundle({ runId, generatedAt, owner, cutoff, model, repos, issues, pullRequests, deterministic, projectContexts, llmAudits });
 	if (reportsBucket) await writeRunContextBundle(reportsBucket, runContext);
-	const llmReport = hasLlmCredentials ? await synthesizeRunReport(session, runContext, rejected, lessons) : null;
+	const llmReport = hasModel ? await synthesizeRunReport(session, runContext, rejected, lessons) : null;
 	const llmProjectRecommendations = llmReport?.projectRecommendations.filter((item) => !rejected.has(item.fingerprint)) ?? [];
 	const manualActionCandidates = llmReport?.draftPrCandidates.filter((item) => !rejected.has(item.fingerprint)) ?? [];
 	const mergedRecommendations = [...llmProjectRecommendations, ...auditRecommendations, ...deterministic.recommendations];
 
 	const report: MaintenanceReport = {
 		ok: true,
-		mode: hasLlmCredentials ? 'llm-assisted' : 'context-only-no-model',
+		mode: hasModel ? 'llm-assisted' : 'context-only-no-model',
 		runId,
-		promptVersion: hasLlmCredentials ? RUN_SYNTHESIS_PROMPT_VERSION : 'no-llm-context-summary-v1',
+		promptVersion: hasModel ? RUN_SYNTHESIS_PROMPT_VERSION : 'no-llm-context-summary-v1',
 		model,
 		contextSummary,
 		owner,
@@ -376,7 +412,7 @@ export default async function ({ init, env, payload }: FlueContext) {
 		priorityActions: llmReport?.priorityActions ?? deterministic.priorityActions.filter((action) => /issue|PR|TODO|failed|stale/i.test(action)),
 		recommendations: mergedRecommendations,
 		projectRecommendations: [...llmProjectRecommendations, ...auditRecommendations],
-		draftPrCandidates: hasLlmCredentials ? manualActionCandidates : [],
+		draftPrCandidates: hasModel ? manualActionCandidates : [],
 		sharedLessons: llmReport?.sharedLessons ?? deterministic.sharedLessons,
 		llmAudits,
 	};
@@ -495,9 +531,9 @@ async function readOrSeedR2(bucket: R2BucketLike | undefined, key: string, defau
 	return defaultValue;
 }
 
-function rejectedFingerprints(rejectionsJson: string) {
+function rejectedFingerprints(rejectionsJson: string): Set<string> {
 	try {
-		return new Set((JSON.parse(rejectionsJson).rejected ?? []).map((item: any) => String(item.fingerprint)));
+		return new Set<string>((JSON.parse(rejectionsJson).rejected ?? []).map((item: any) => String(item.fingerprint)));
 	} catch {
 		return new Set<string>();
 	}
@@ -654,7 +690,7 @@ function buildRunContextBundle(options: {
 	repos: RepoSummary[];
 	issues: WorkItem[];
 	pullRequests: WorkItem[];
-	deterministic: Omit<MaintenanceReport, 'ok' | 'mode' | 'runId' | 'promptVersion' | 'model' | 'contextSummary' | 'owner' | 'repoCount' | 'generatedAt' | 'r2' | 'llmAudits'>;
+	deterministic: ReturnType<typeof buildDeterministicReport>;
 	projectContexts: ProjectContext[];
 	llmAudits: AuditRunSummary;
 }): RunContextBundle {
@@ -689,8 +725,8 @@ async function writeRunContextBundle(bucket: R2BucketLike, bundle: RunContextBun
 	await bucket.put(`contexts/runs/${bundle.runId}.json`, `${JSON.stringify(bundle, null, 2)}\n`, { httpMetadata: { contentType: 'application/json' } });
 }
 
-async function synthesizeRunReport(session: any, bundle: RunContextBundle, rejected: Set<string>, lessons: string) {
-	return session.prompt(
+async function synthesizeRunReport(session: FlueSession, bundle: RunContextBundle, rejected: Set<string>, lessons: string): Promise<v.InferOutput<typeof ReportSchema>> {
+	const response = await session.prompt(
 		`Create today's read-only MaintainerBot handoff from this stored run context bundle.
 
 Run context bundle JSON:
@@ -707,8 +743,9 @@ MaintainerBot is read-only: do not claim it created branches, commits, PRs, comm
 Lean on deterministic findings and latest project audits. Rank the human handoff by evidence, urgency, and likely impact.
 If evidence is weak, recommend investigation rather than action.
 Return concise, actionable recommendations with stable fingerprints and evidence.`,
-		{ role: 'maintainer', result: ReportSchema },
+		{ result: ReportSchema },
 	);
+	return response.data;
 }
 
 function buildContextSummary(options: { repos: RepoSummary[]; projectContexts: ProjectContext[]; prepared: PreparedContexts; llmConfigured: boolean }): ContextSummary {
@@ -755,7 +792,7 @@ async function loadExistingProjectAudits(bucket: R2BucketLike | undefined, proje
 
 async function auditChangedProjects(options: {
 	bucket: R2BucketLike | undefined;
-	session: any;
+	session: FlueSession;
 	projectContexts: ProjectContext[];
 	rejected: Set<string>;
 	lessons: string;
@@ -791,7 +828,7 @@ async function auditChangedProjects(options: {
 			}
 		}
 
-		const audit = await options.session.prompt(
+		const { data: audit } = await options.session.prompt(
 			`You are MaintainerBot auditing one repository.
 
 Use only the supplied project context. Do not invent files, issues, PRs, or TODOs.
@@ -806,7 +843,7 @@ ${JSON.stringify([...options.rejected], null, 2)}
 
 Shared lessons:
 ${options.lessons}`,
-			{ role: 'maintainer', result: ProjectAuditSchema },
+			{ result: ProjectAuditSchema },
 		);
 		const normalized: ProjectAudit = {
 			repo: project.repo,

@@ -1,12 +1,12 @@
 # MaintainerBot Architecture
 
-## Core Flue agent
+## Core Flue workflow
 
 ```txt
-.flue/agents/daily-maintenance.ts
+.flue/workflows/daily-maintenance.ts
 ```
 
-The agent:
+The workflow:
 
 1. Validates the protected webhook secret.
 2. Loads durable memory from R2.
@@ -17,7 +17,7 @@ The agent:
 7. Writes the living status page, latest aliases, audit ledgers, and historic reports to R2.
 8. Optionally sends email via Cloudflare Email Routing, though email is not a current priority.
 
-The deployed daily agent is read-only with respect to GitHub: it reads metadata and writes only MaintainerBot-owned R2 objects.
+The deployed daily workflow is read-only with respect to GitHub: it reads metadata and writes only MaintainerBot-owned R2 objects.
 
 ## Storage
 
@@ -46,9 +46,9 @@ reports/history/YYYY-MM-DD/daily-maintenance.json
 
 ## Runtime
 
-The daily agent uses a lightweight `just-bash` sandbox for local scratch files. GitHub API calls happen from trusted runtime code with secrets in env, not from prompts.
+The daily workflow uses Flue's default virtual sandbox for local scratch files. GitHub API calls happen from trusted runtime code with secrets in env, not from prompts.
 
-CLI-only agents are used for heavyweight read-only workflows. `deep-verify` clones changed repos into temporary local sandboxes, runs safe allowlisted verification commands, and summarizes evidence without mutating GitHub.
+CLI-only workflows are used for heavyweight read-only checks. `deep-verify` clones changed repos into temporary local sandboxes, runs safe verification commands, and summarizes evidence without mutating GitHub.
 
 ## Context bundles
 
@@ -62,7 +62,7 @@ docs/CONTEXT.md
 
 ## LLM context
 
-With LLM credentials, the agent calls an LLM to synthesize the daily handoff from deterministic surface-audit facts. Without LLM credentials, it still builds/reuses context bundles and publishes a degraded context-only report. It computes state/input hashes for each project and only sends changed project bundles to per-project LLM audits when a model is configured. Each context includes repository metadata, health signals, open TODOs from root TODO files, open issues, open PRs, and deterministic findings. Secrets are not included.
+With LLM credentials, the workflow calls an LLM to synthesize the daily handoff from deterministic surface-audit facts. Without LLM credentials, it still builds/reuses context bundles and publishes a degraded context-only report. It computes state/input hashes for each project and only sends changed project bundles to per-project LLM audits when a model is configured. Each context includes repository metadata, health signals, open TODOs from root TODO files, open issues, open PRs, and deterministic findings. Secrets are not included.
 
 LLM audit history is stored in R2:
 

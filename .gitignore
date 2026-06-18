@@ -4,6 +4,8 @@ node_modules
 !.env.example
 .webhook-secret
 dist
+.flue-vite
+.flue-vite.wrangler.jsonc
 .wrangler
 .tmp
 .DS_Store

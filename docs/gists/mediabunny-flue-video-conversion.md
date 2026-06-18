@@ -13,14 +13,14 @@ The important Flue idea: **the sandbox is just a strategy**. Start with Just Bas
 
 ---
 
-## `.flue/agents/video-convert.ts`
+## `.flue/workflows/video-convert.ts`
 
 ```ts
-import type { FlueContext } from '@flue/sdk/client';
+import { bash, createAgent, type FlueContext, type WorkflowRouteHandler } from '@flue/runtime';
 import { Bash, InMemoryFs } from 'just-bash';
 import * as v from 'valibot';
 
-export const triggers = { webhook: true };
+export const route: WorkflowRouteHandler = async (_c, next) => next();
 
 /**
  * Bind this in wrangler.jsonc:
@@ -44,7 +44,15 @@ const PayloadSchema = v.object({
   mode: v.optional(v.picklist(['mock', 'real'])),
 });
 
-export default async function videoConvert({ init, env, payload, id }: FlueContext) {
+type VideoPayload = v.InferOutput<typeof PayloadSchema>;
+
+const videoWorker = createAgent<VideoPayload, Record<string, any>>(() => ({
+  sandbox: bash(makeJustBashPseudoSandbox()),
+  cwd: '/workspace',
+  model: false, // Conversion is deterministic; no LLM needed for the worker step.
+}));
+
+export async function run({ init, env, payload }: FlueContext<VideoPayload>) {
   const args = v.parse(PayloadSchema, payload);
   const bucket = env.MEDIA_R2 as R2BucketLike | undefined;
   if (!bucket) throw new Error('MEDIA_R2 binding is required');
@@ -69,16 +77,8 @@ export default async function videoConvert({ init, env, payload, id }: FlueConte
    * The agent contract stays the same: the sandbox receives a job and produces
    * an output artifact. R2 remains the durable input/output store.
    */
-  const sandbox = makeJustBashPseudoSandbox();
-
-  const agent = await init({
-    id,
-    sandbox,
-    cwd: '/workspace',
-    model: false, // Conversion is deterministic; no LLM needed for the worker step.
-  });
-
-  const session = await agent.session('convert');
+  const harness = await init(videoWorker);
+  const session = await harness.session('convert');
 
   await session.shell('mkdir -p /workspace/in /workspace/out /workspace/scripts');
 

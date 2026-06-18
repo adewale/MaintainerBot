@@ -54,7 +54,7 @@ Deferred work and future milestones.
 - [x] Add Cloudflare Worker build/deploy scripts.
 - [x] Create/bind R2 bucket `maintainerbot-data`.
 - [x] Store rejections, lessons, latest reports, audit history, and historic reports in R2.
-- [x] Deploy webhook agent to Cloudflare.
+- [x] Deploy webhook workflow to Cloudflare.
 - [x] Add a daily scheduler that invokes the Cloudflare webhook.
 - [x] Add shared-secret protection for the public webhook endpoint.
 - [ ] Consider moving from payload secret to header-based auth if Flue exposes request headers.

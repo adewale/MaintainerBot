@@ -14,7 +14,7 @@ Never commit real tokens.
 
 ## Protected webhook
 
-The Cloudflare webhook requires `MAINTAINERBOT_WEBHOOK_SECRET` when configured. The secret is sent in the JSON payload because Flue currently exposes payload/env to agents rather than raw request headers.
+The Cloudflare workflow webhook requires `MAINTAINERBOT_WEBHOOK_SECRET` when configured. The secret is sent in the JSON payload and checked by the `daily-maintenance` workflow before work begins.
 
 If the secret leaks:
 

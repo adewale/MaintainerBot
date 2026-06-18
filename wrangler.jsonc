@@ -18,5 +18,21 @@
     {
       "name": "SEND_EMAIL"
     }
+  ],
+  "migrations": [
+    {
+      "tag": "flue-class-DailyMaintenance",
+      "new_sqlite_classes": ["DailyMaintenance"]
+    },
+    {
+      "tag": "flue-1-runtime-workflows",
+      "new_sqlite_classes": ["FlueDeepVerifyWorkflow", "FlueRegistry"],
+      "renamed_classes": [
+        {
+          "from": "DailyMaintenance",
+          "to": "FlueDailyMaintenanceWorkflow"
+        }
+      ]
+    }
   ]
 }

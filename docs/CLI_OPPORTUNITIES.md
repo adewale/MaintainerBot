@@ -1,10 +1,10 @@
 # CLI-only Opportunities
 
-MaintainerBot's scheduled Worker should stay lightweight and read-only. CLI-only Flue agents and local/GitHub Actions tools are better for anything that needs a checkout, dependency install, or command execution.
+MaintainerBot's scheduled Worker should stay lightweight and read-only. CLI-only Flue workflows and local/GitHub Actions tools are better for anything that needs a checkout, dependency install, or command execution.
 
 ## Added: `deep-verify`
 
-`deep-verify` is a CLI-only, read-only Flue agent:
+`deep-verify` is a CLI-only, read-only Flue workflow:
 
 ```bash
 pnpm run deep:verify -- --payload '{"repo":"adewale/project"}'
@@ -15,12 +15,12 @@ It:
 - fetches repo metadata with an optional read-only GitHub token
 - refuses repos not changed since `2025-11-17T00:00:00.000Z`
 - clones the repo into `/tmp`
-- asks a skill to choose safe verification commands
-- runs at most five allowlisted commands
+- asks the verifier agent to choose safe verification commands
+- runs at most five commands matching the local verification allowlist
 - summarizes evidence and recommended next human actions
 - never pushes, comments, labels, opens PRs, or edits GitHub state
 
-## Where CLI-only agents/tools help
+## Where CLI-only workflows/tools help
 
 - **Deep verification:** clone repo, install deps, run tests/build/check/lint.
 - **CI log summarization:** fetch failed workflow/job logs with `gh` or GitHub REST, truncate logs, summarize likely failure causes.
@@ -31,8 +31,8 @@ It:
 
 ## Lessons borrowed from Astro's `.flue`
 
-- **Use CLI-only agents for heavyweight work.** No public route is needed for checkout/test workflows.
-- **Use command allowlists.** Pass only the commands a workflow needs.
+- **Use CLI-only workflows for heavyweight work.** No public route is needed for checkout/test workflows.
+- **Use command allowlists.** Run only commands matching the workflow's local verification policy.
 - **Stage workflows.** Prefer `plan → run checks → summarize` over one large prompt.
 - **Fetch noisy external data before prompting.** CI logs should be fetched and truncated before the LLM sees them.
 - **Use schemas for every LLM result.** Structured outputs make reports stable and machine-checkable.

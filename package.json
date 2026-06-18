@@ -3,14 +3,14 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "flue build --target node --output .",
-    "build:cloudflare": "flue build --target cloudflare --output .",
-    "dev": "flue dev --target node --env .env",
-    "dev:cloudflare": "flue dev --target cloudflare --env .env",
-    "deploy:cloudflare": "flue build --target cloudflare --output . && wrangler deploy --config dist/wrangler.jsonc",
+    "build": "flue build --target node",
+    "build:cloudflare": "flue build --target cloudflare",
+    "dev": "flue dev --target node",
+    "dev:cloudflare": "flue dev --target cloudflare",
+    "deploy:cloudflare": "flue build --target cloudflare && wrangler deploy --config dist/maintainerbot/wrangler.json",
     "deploy:status": "wrangler deploy --config wrangler.status.jsonc",
-    "daily": "flue run daily-maintenance --target node --id daily --payload '{}' --env .env --output .",
-    "deep:verify": "flue run deep-verify --target node --env .env --output .",
+    "daily": "flue run daily-maintenance --target node --payload '{}'",
+    "deep:verify": "flue run deep-verify --target node",
     "save:daily": "node scripts/run-daily.mjs",
     "reject": "node scripts/reject.mjs",
     "test:rejections": "node scripts/test-rejections.mjs",
@@ -18,14 +18,16 @@
     "check:secrets": "node scripts/check-secrets.mjs"
   },
   "dependencies": {
-    "@flue/sdk": "latest",
-    "agents": "^0.12.3",
+    "@flue/runtime": "1.0.0-beta.1",
+    "agents": "^0.14.5",
     "just-bash": "^2.14.2",
     "valibot": "^1.0.0"
   },
   "devDependencies": {
-    "@flue/cli": "latest",
+    "@cloudflare/workers-types": "^4.20260617.1",
+    "@flue/cli": "1.0.0-beta.1",
+    "@types/node": "^25.9.3",
     "typescript": "^5.9.2",
-    "wrangler": "^4.89.1"
+    "wrangler": "^4.101.0"
   }
 }

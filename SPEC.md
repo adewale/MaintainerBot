@@ -27,10 +27,10 @@ Later phases may add read-only checkout/eval/coding-agent workflows, but those p
 
 ## Runtime
 
-Main agent:
+Main workflow:
 
 ```txt
-.flue/agents/daily-maintenance.ts
+.flue/workflows/daily-maintenance.ts
 ```
 
 Public status Worker:
@@ -75,7 +75,7 @@ CF_AI_GATEWAY_TOKEN
 
 ```txt
 GitHub Actions or manual caller
-  → POST protected webhook
+  → POST protected `/workflows/daily-maintenance?wait=result` webhook
   → load R2 memory/indexes
   → fetch cheap repo/issue/PR facts
   → filter repos changed since 2025-11-17
