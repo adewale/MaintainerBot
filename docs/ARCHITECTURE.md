@@ -1,5 +1,50 @@
 # MaintainerBot Architecture
 
+## Architecture diagram
+
+```mermaid
+flowchart LR
+  ghActions["GitHub Actions schedule<br/>or manual curl"] --> route["Cloudflare Worker<br/>/workflows/daily-maintenance?wait=result"]
+  route --> secret{"Webhook secret valid?"}
+  secret -- "no" --> unauthorized["401 / Unauthorized"]
+  secret -- "yes" --> workflow["Flue workflow<br/>daily-maintenance"]
+
+  workflow --> r2Read["Read R2 memory<br/>rejections + lessons + context index"]
+  workflow --> ghApi["GitHub REST API<br/>repos + issues + PRs + root files"]
+  ghApi -. "optional read-only token" .-> ghToken["GITHUB_TOKEN"]
+  workflow --> deterministic["Deterministic scan<br/>health + TODOs + recommendations"]
+  r2Read --> context["Project context builder<br/>fingerprints + input hashes"]
+  ghApi --> context
+  deterministic --> context
+
+  context --> changed{"Context changed?"}
+  changed -- "no" --> reuse["Reuse previous context/audit"]
+  changed -- "yes" --> writeContext["Write context bundle to R2"]
+  changed -- "yes + model configured" --> projectAudit["LLM project audit"]
+  reuse --> runBundle["Run context bundle"]
+  writeContext --> runBundle
+  projectAudit --> runBundle
+
+  runBundle --> modelGate{"LLM configured?"}
+  modelGate -- "yes" --> synthesis["LLM final synthesis"]
+  modelGate -- "no" --> contextOnly["Context-only report"]
+  synthesis --> report["MaintenanceReport JSON + Markdown"]
+  contextOnly --> report
+
+  report --> r2Write["Write R2 outputs<br/>MaintainerBotOut.*, latest aliases,<br/>history, contexts, audits"]
+  report -. "optional" .-> email["Cloudflare Email Routing"]
+  r2Write --> statusWorker["Status Worker<br/>workers/status.ts"]
+  statusWorker --> statusPage["Live status page + /json"]
+  r2Write --> publicR2["Public raw Markdown"]
+
+  subgraph "CLI-only evidence path"
+    cli["flue run deep-verify"] --> local["Node local() sandbox"]
+    local --> clone["Temporary git clone in /tmp"]
+    clone --> checks["Allowlisted verification commands"]
+    checks --> verifySummary["Structured verification summary"]
+  end
+```
+
 ## Core Flue workflow
 
 ```txt
