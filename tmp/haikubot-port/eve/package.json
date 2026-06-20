@@ -1,0 +1,10 @@
+{
+  "name": "haikubot-eve",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "eve": "latest",
+    "ai": "latest",
+    "zod": "latest"
+  }
+}
