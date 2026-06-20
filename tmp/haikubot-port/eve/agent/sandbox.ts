@@ -1,5 +1,5 @@
 import { defineSandbox } from "eve/sandbox";
-import { justbash } from "eve/sandbox/justbash";
+import { justbash } from "eve/sandbox/just-bash";
 
 // Local sandbox for HaikuBot.
 //
@@ -8,9 +8,8 @@ import { justbash } from "eve/sandbox/justbash";
 // in-process backend — no Docker, no remote — which also happens to be the
 // same engine the original gist used by hand (`just-bash` + `InMemoryFs`).
 //
-// NOTE: the `eve/sandbox/justbash` import path follows the documented pattern
-// for `eve/sandbox/docker`; treat it as inferred rather than copied from a
-// published example.
+// Subpath is `eve/sandbox/just-bash` (hyphenated) exporting `justbash` —
+// verified against eve@0.11.8's package exports.
 export default defineSandbox({
   backend: justbash(),
 });

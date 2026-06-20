@@ -1,0 +1,9 @@
+node_modules/
+.output/
+.eve/
+.nitro/
+.workflow-data/
+.flue-vite/
+dist/
+package-lock.json
+*.log

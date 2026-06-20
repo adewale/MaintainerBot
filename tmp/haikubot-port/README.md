@@ -15,6 +15,48 @@ three frameworks.
 | Schema lib | valibot | valibot | zod |
 | Model id | `anthropic/claude-haiku-4-5` | `anthropic/claude-haiku-4-5` | `anthropic/claude-haiku-4.5` (dots!) |
 
+## Run results (actually executed, 2026-06-20)
+
+All three were installed from the real npm packages (`@flue/runtime` →
+withastro/flue, `eve` → vercel/eve, `@flue/sdk` + `just-bash` → vercel-labs) and
+run. No model credentials were available in the sandbox, so none could emit a
+real haiku — but two of three executed cleanly right up to the model call:
+
+| | Result | Where it stopped |
+|---|---|---|
+| `original/` (old Flue) | ✗ won't load/run | `import '@flue/sdk/client'` → `ERR_PACKAGE_PATH_NOT_EXPORTED`; the subpath no longer exists and today's `@flue/sdk` exports `createFlueClient` (an HTTP client), not the `FlueContext`/`init` the gist needs. Its `export default fn` + `init({...})` entry shape matches no current runtime. |
+| `flue/` (modern) | ✓ runs end-to-end | `flue run haiku --target node` discovered the workflow in `src/workflows/`, assigned a runId, executed to the prompt, then: `No API key for provider: anthropic`. |
+| `eve/` (Eve) | ✓ runs end-to-end | compiled 0 errors, built a Nitro server, full session lifecycle streamed (`session.started → turn.started → step.started → step.failed`), then: `MODEL_CALL_FAILED` — AI Gateway 401 (needs `eve link` / `AI_GATEWAY_API_KEY`). |
+
+Running it surfaced a **real bug the docs-only version had**: Eve's just-bash
+backend import is `eve/sandbox/just-bash` (hyphenated), not `eve/sandbox/justbash`.
+Eve also hard-requires Node >= 24 (Flue is happy on 22.19+).
+
+Net: "structurally correct, blocked only on credentials" for the two modern
+ports; the original is a museum piece — kept for the run attempt, not buildable.
+
+## Is there code reuse between the three?
+
+Essentially **none at the code level** — they are three independent projects with
+separate `package.json`s, dependency trees, and framework APIs; nothing is
+imported across them. What's actually shared is *content*, not *code*:
+
+- **The prompt string** (`Write a fresh original haiku… 5-7-5… Random seed…`) is
+  copy-pasted verbatim into all three. This is the only literal reuse.
+- **The output contract** `{ theme, haiku[], note }` is re-declared in each:
+  valibot in the original and in `flue/`, **zod** in `eve/`. Same shape, three
+  declarations, two libraries.
+- **The model id** is the same model, spelled `claude-haiku-4-5` (Flue) vs
+  `claude-haiku-4.5` (Eve).
+
+Everything structural — how the agent is described, how it's triggered, how the
+sandbox is wired, how structured output is captured — is framework-specific and
+cannot be shared. The orchestration in `flue/` (a `run` export that `init`s an
+agent and calls `prompt(..., { result })`) has no counterpart in `eve/`, where
+the same job is spread across `agent.ts` + `instructions.md` + a tool's
+`outputSchema`. The portable surface of "the same bot" turned out to be just a
+prompt and a data shape; the wiring doesn't travel.
+
 ## What we learned
 
 1. **Modern Flue is the same idea, refactored, not reinvented.** The old gist
@@ -58,16 +100,15 @@ three frameworks.
 
 ## Honesty about fidelity
 
-These compile-faithfully against the documented APIs, but they were written from
-docs, not run against a real install. Two spots are inferred rather than copied
-from a published example:
+Originally written from docs; since **actually installed and run** (see Run
+results above), which resolved both previously-inferred spots:
 
-- the exact `flue run <name>` ↔ workflow-`run`-export wiring (the CLI docs show
-  `flue run <workflow> --payload …`, and a CLI-invoked workflow doesn't need a
-  webhook trigger, but the docs don't show this specific agent file run that
-  way);
-- Eve's `eve/sandbox/justbash` import path (extrapolated from the documented
-  `eve/sandbox/docker` pattern; `justbash` is listed as an available local
-  backend but without an import example).
+- the `flue run haiku --target node` ↔ `src/workflows/` discovery wiring is
+  **confirmed** — the CLI found and ran the workflow;
+- Eve's backend import was **wrong** in the docs-only version
+  (`eve/sandbox/justbash`) and is now fixed to the real subpath
+  `eve/sandbox/just-bash`, verified against eve@0.11.8's package exports.
 
-Both are flagged in inline comments in the source.
+Remaining unverified: neither modern port produced an actual haiku, because the
+sandbox had no model credentials (Anthropic key for Flue; Vercel AI Gateway
+token for Eve). Both reached the model call and failed only on auth.
