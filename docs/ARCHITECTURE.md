@@ -4,7 +4,7 @@
 
 ```mermaid
 flowchart LR
-  ghActions["GitHub Actions schedule<br/>or manual curl"] --> route["Cloudflare Worker<br/>/workflows/daily-maintenance?wait=result"]
+  ghActions["GitHub Actions schedule<br/>or manual curl"] --> route["Cloudflare Worker<br/>/agents/daily-maintenance/daily"]
   route --> secret{"Webhook secret valid?"}
   secret -- "no" --> unauthorized["401 / Unauthorized"]
   secret -- "yes" --> workflow["Flue workflow<br/>daily-maintenance"]

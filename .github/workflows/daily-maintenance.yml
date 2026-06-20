@@ -14,6 +14,6 @@ jobs:
           MAINTAINERBOT_WEBHOOK_SECRET: ${{ secrets.MAINTAINERBOT_WEBHOOK_SECRET }}
         run: |
           test -n "$MAINTAINERBOT_WEBHOOK_SECRET"
-          curl --fail-with-body -X POST "https://maintainerbot.adewale-883.workers.dev/workflows/daily-maintenance?wait=result" \
+          curl --fail-with-body -X POST "https://maintainerbot.adewale-883.workers.dev/agents/daily-maintenance/daily" \
             -H "Content-Type: application/json" \
             -d "{\"webhookSecret\":\"$MAINTAINERBOT_WEBHOOK_SECRET\"}"
