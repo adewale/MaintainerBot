@@ -17,16 +17,24 @@ three frameworks.
 
 ## Run results (actually executed, 2026-06-20)
 
-All three were installed from the real npm packages (`@flue/runtime` →
-withastro/flue, `eve` → vercel/eve, `@flue/sdk` + `just-bash` → vercel-labs) and
-run. No model credentials were available in the sandbox, so none could emit a
-real haiku — but two of three executed cleanly right up to the model call:
+All were installed from the real npm packages (`@flue/runtime` → withastro/flue,
+`eve` → vercel/eve, `@flue/sdk` + `just-bash` → vercel-labs) and run. No model
+credentials were available in the sandbox, so none could emit a real haiku — but
+the three modern artifacts each executed cleanly right up to the model call.
 
-| | Result | Where it stopped |
-|---|---|---|
-| `original/` (old Flue) | ✗ won't load/run | `import '@flue/sdk/client'` → `ERR_PACKAGE_PATH_NOT_EXPORTED`; the subpath no longer exists and today's `@flue/sdk` exports `createFlueClient` (an HTTP client), not the `FlueContext`/`init` the gist needs. Its `export default fn` + `init({...})` entry shape matches no current runtime. |
-| `flue/` (modern) | ✓ runs end-to-end | `flue run haiku --target node` discovered the workflow in `src/workflows/`, assigned a runId, executed to the prompt, then: `No API key for provider: anthropic`. |
-| `eve/` (Eve) | ✓ runs end-to-end | compiled 0 errors, built a Nitro server, full session lifecycle streamed (`session.started → turn.started → step.started → step.failed`), then: `MODEL_CALL_FAILED` — AI Gateway 401 (needs `eve link` / `AI_GATEWAY_API_KEY`). |
+The deliverable is **three artifacts** (plus the museum-piece original):
+
+| Artifact | File | Driven by | Result |
+|---|---|---|---|
+| **Flue workflow** | `flue/src/workflows/haiku.ts` (exports `run`) | `flue run haiku --target node` | ✓ discovered in `src/workflows/`, got a runId, ran to the prompt → `No API key for provider: anthropic` |
+| **Flue agent** | `flue/src/agents/haiku-chat.ts` (default `createAgent`) | `flue connect haiku-chat <id>` | ✓ discovered in `src/agents/`, connected, processed the submission → `No API key for provider: anthropic` |
+| **Eve agent** | `eve/agent/` (directory) | `POST /eve/v1/session` on the built server | ✓ compiled 0 errors, full session lifecycle streamed → `MODEL_CALL_FAILED` (AI Gateway 401) |
+| _original (old Flue)_ | `original/haiku.ts` | _n/a_ | ✗ `import '@flue/sdk/client'` → `ERR_PACKAGE_PATH_NOT_EXPORTED`; today's `@flue/sdk` exports `createFlueClient` (an HTTP client), not the `FlueContext`/`init` the gist needs. Entry shape matches no current runtime. |
+
+The Flue **workflow** vs **agent** split is the same distinction discussed
+elsewhere in this repo: a workflow is a one-shot `run` you invoke and that
+returns; an agent is a continuing instance you address by id (`haiku-chat/<id>`)
+and converse with. Same model + local sandbox; different lifecycle.
 
 Running it surfaced a **real bug the docs-only version had**: Eve's just-bash
 backend import is `eve/sandbox/just-bash` (hyphenated), not `eve/sandbox/justbash`.
