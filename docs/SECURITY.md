@@ -30,6 +30,7 @@ Run before pushing:
 
 ```bash
 pnpm run check:secrets
+pnpm run check
 pnpm run test:rejections
 pnpm run build:cloudflare
 ```

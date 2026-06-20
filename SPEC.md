@@ -162,16 +162,17 @@ reports/history/YYYY-MM-DD/daily-maintenance.json
 - Use least-privilege/read-only GitHub tokens.
 - Durable data is in R2.
 - Public source must contain no secrets.
-- Run `pnpm run check:secrets` before pushing.
+- Run `pnpm run check:secrets`, `pnpm run check`, and focused tests before pushing.
 - MaintainerBot writes only its own R2 objects.
 
 ## Local commands
 
 ```bash
 pnpm install
-pnpm run build:cloudflare
 pnpm run check:secrets
+pnpm run check
 pnpm run test:rejections
+pnpm run build:cloudflare
 pnpm run deploy:cloudflare
 pnpm run deploy:status
 ```

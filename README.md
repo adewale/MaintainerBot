@@ -77,6 +77,8 @@ reports/history/YYYY-MM-DD/daily-maintenance.json
 
 ## Run locally
 
+Requires Node.js 22.19+ and pnpm 9.12.3.
+
 ```bash
 pnpm install
 cp .env.example .env
@@ -154,6 +156,7 @@ Before pushing:
 
 ```bash
 pnpm run check:secrets
+pnpm run check
 pnpm run test:rejections
 pnpm run build:cloudflare
 ```

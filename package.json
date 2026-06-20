@@ -2,6 +2,10 @@
   "name": "maintainer-bot",
   "private": true,
   "type": "module",
+  "packageManager": "pnpm@9.12.3",
+  "engines": {
+    "node": ">=22.19.0"
+  },
   "scripts": {
     "build": "flue build --target node",
     "build:cloudflare": "flue build --target cloudflare",
@@ -9,6 +13,7 @@
     "dev:cloudflare": "flue dev --target cloudflare",
     "deploy:cloudflare": "flue build --target cloudflare && wrangler deploy --config dist/maintainerbot/wrangler.json",
     "deploy:status": "wrangler deploy --config wrangler.status.jsonc",
+    "check": "tsc --noEmit",
     "daily": "flue run daily-maintenance --target node --payload '{}'",
     "deep:verify": "flue run deep-verify --target node",
     "save:daily": "node scripts/run-daily.mjs",
@@ -20,14 +25,19 @@
   "dependencies": {
     "@flue/runtime": "1.0.0-beta.2",
     "agents": "^0.14.5",
-    "just-bash": "^2.14.2",
-    "valibot": "^1.0.0"
+    "just-bash": "^3.0.1",
+    "valibot": "^1.4.1"
   },
   "devDependencies": {
-    "@cloudflare/workers-types": "^4.20260617.1",
+    "@cloudflare/workers-types": "^4.20260620.1",
     "@flue/cli": "1.0.0-beta.1",
-    "@types/node": "^25.9.3",
-    "typescript": "^5.9.2",
-    "wrangler": "^4.101.0"
+    "@types/node": "^22.20.0",
+    "typescript": "^6.0.3",
+    "wrangler": "^4.103.0"
+  },
+  "pnpm": {
+    "overrides": {
+      "@flue/runtime": "1.0.0-beta.2"
+    }
   }
 }
