@@ -1,4 +1,5 @@
 import { createAgent, type FlueContext } from '@flue/runtime';
+import { local } from '@flue/runtime/node';
 import * as v from 'valibot';
 
 // HaikuBot — modern Flue port.
@@ -11,11 +12,19 @@ import * as v from 'valibot';
 // Modern Flue (`@flue/runtime`, Node >= 22.19) splits those two jobs:
 //   1. createAgent(...)  — *describe* the agent (model, cwd, sandbox).
 //   2. the `run` export  — *drive* a single invocation via the FlueContext.
-// The built-in virtual sandbox replaces just-bash/InMemoryFs, so the agent
-// gets `harness.fs` and `harness.shell` for free.
+//
+// Triggering: this is a one-shot "generate a haiku" job, so it's a workflow
+// driven from the CLI rather than a webhook. There is no
+// `export const triggers = { webhook: true }`; instead you invoke it with
+//   npx flue run haiku --payload '{"theme":"autumn rain"}'
+// which runs locally without going through HTTP ingress.
+//
+// Sandbox: `local()` (from @flue/runtime/node) runs the agent against the host
+// filesystem under `cwd`, replacing the in-memory virtual sandbox.
 
 const haikuBot = createAgent(() => ({
   model: 'anthropic/claude-haiku-4-5',
+  sandbox: local(),
   cwd: '/workspace',
 }));
 
@@ -25,9 +34,8 @@ const HaikuResult = v.object({
   note: v.string(),
 });
 
-// Same entry point as before: fire on an inbound webhook carrying { theme }.
-export const triggers = { webhook: true };
-
+// CLI-triggered workflow entry point. `payload` comes from
+// `flue run haiku --payload '{ "theme": "..." }'`.
 export async function run({ init, payload }: FlueContext<{ theme?: string }>) {
   const harness = await init(haikuBot);
 

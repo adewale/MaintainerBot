@@ -6,7 +6,7 @@
     "node": ">=22.19.0"
   },
   "scripts": {
-    "dev": "flue connect haiku local"
+    "haiku": "flue run haiku --payload '{\"theme\":\"the present moment\"}'"
   },
   "dependencies": {
     "@flue/runtime": "latest",
