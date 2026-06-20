@@ -2,23 +2,18 @@ import { createAgent, type FlueContext } from '@flue/runtime';
 import { local } from '@flue/runtime/node';
 import * as v from 'valibot';
 
-// HaikuBot — modern Flue port.
+// HaikuBot as a Flue workflow.
 //
-// The old gist packed everything into one `export default async function`: it
-// imported `FlueContext` from '@flue/sdk/client', built a sandbox from
-// `just-bash` + `InMemoryFs`, then called `init({ sandbox, cwd, model })`.
-//
-// Modern Flue (`@flue/runtime`, Node >= 22.19) splits that into two exports:
-//   1. createAgent(...): the agent's config (model, cwd, sandbox).
+// Flue keeps an agent's config separate from a single invocation:
+//   1. createAgent(...): the model, cwd, and sandbox.
 //   2. run(...): one invocation, receiving the agent via FlueContext.
 //
 // This file exports run(), so Flue treats it as a workflow and requires it
-// under src/workflows/. An agent would be a default createAgent export under
-// src/agents/. Flue reads the folder name to decide which it is.
+// under src/workflows/. A default createAgent export under src/agents/ would be
+// an agent instead; Flue reads the folder name to decide.
 //
-// No `export const triggers = { webhook: true }`: a workflow is reached by
-// `npx flue run haiku --payload '{"theme":"autumn rain"}'`, which invokes run()
-// directly without registering an HTTP route.
+// A workflow is reached by `npx flue run haiku --payload '{"theme":"autumn rain"}'`,
+// which invokes run() directly without registering an HTTP route.
 //
 // `local()` (from @flue/runtime/node) executes shell and fs against the host
 // filesystem under `cwd`, in place of the default in-memory sandbox.
@@ -40,8 +35,8 @@ const HaikuResult = v.object({
 export async function run({ init, payload }: FlueContext<{ theme?: string }>) {
   const harness = await init(haikuBot);
 
-  // Mirrors the original `mkdir -p .../haiku && printf <seed> > seed.txt`,
-  // but written through the harness fs instead of a raw shell heredoc.
+  // Persist a per-run seed in the workspace and pass it into the prompt below,
+  // so repeated runs don't converge on the same haiku.
   const seed = crypto.randomUUID();
   await harness.fs.writeFile('haiku/seed.txt', seed);
 
@@ -59,6 +54,6 @@ Rules:
   );
 
   // Flue parses + validates against the valibot schema and hands it back,
-  // fully typed, on response.data (the old code returned the raw prompt call).
+  // fully typed, on response.data.
   return response.data;
 }

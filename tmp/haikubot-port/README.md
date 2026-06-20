@@ -1,122 +1,108 @@
-# HaikuBot — three eras, one bot
+# HaikuBot — Flue and Eve
 
-Same bot (generate a fresh 5-7-5 haiku on a theme, with a random seed so repeat
-calls differ, returning a structured `{ theme, haiku[], note }`), ported across
-three frameworks.
+Two implementations of one bot: generate a fresh 5-7-5 haiku on a theme, with a
+random seed so repeated calls differ, returning a structured
+`{ theme, haiku[], note }`. One is built in Flue, one in Eve.
 
-| | Original gist (old Flue) | `flue/` (modern Flue) | `eve/` (Eve) |
-|---|---|---|---|
-| Package | `@flue/sdk/client` | `@flue/runtime` + `@flue/cli` | `eve` + `ai` + `zod` |
-| File | `haiku.ts` | `src/workflows/haiku.ts` (workflow → `run` export) | `agent/` directory |
-| Shape | one `export default async fn` | `createAgent()` + `run` export | a **directory** of files |
-| Sandbox | hand-rolled `just-bash` + `InMemoryFs` | **local** sandbox: `local()` from `@flue/runtime/node` | **local** sandbox: `defineSandbox({ backend: justbash() })` |
-| Structured output | `valibot` schema on `session.prompt(..., { result })` | same, returned on `response.data` | tool `outputSchema` (Zod) |
-| Trigger | `export const triggers = { webhook: true }` | **CLI**: `flue run haiku --payload '{"theme":"…"}'` | **CLI**: dev TUI via `npx eve dev` |
-| Schema lib | valibot | valibot | zod |
-| Model id | `anthropic/claude-haiku-4-5` | `anthropic/claude-haiku-4-5` | `anthropic/claude-haiku-4.5` (dots!) |
+| | `flue/` (Flue) | `eve/` (Eve) |
+|---|---|---|
+| Packages | `@flue/runtime` + `@flue/cli` | `eve` + `ai` + `zod` |
+| Layout | files under `src/agents/` and `src/workflows/` | an `agent/` directory |
+| Shape | `createAgent()` config + a `run` export | files Eve maps by path |
+| Sandbox | `local()` from `@flue/runtime/node` | `defineSandbox({ backend: justbash() })` |
+| Structured output | valibot schema on `session.prompt(..., { result })` | a tool's `outputSchema` (zod) |
+| CLI entry | `flue run haiku` / `flue connect haiku-chat <id>` | `npx eve dev` TUI, or `POST /eve/v1/session` |
+| Schema lib | valibot | zod |
+| Model id | `anthropic/claude-haiku-4-5` | `anthropic/claude-haiku-4.5` (a dot) |
+| Min Node | 22.19 | 24 |
 
-## Run results (actually executed, 2026-06-20)
+## Three artifacts
 
-All were installed from the real npm packages (`@flue/runtime` → withastro/flue,
-`eve` → vercel/eve, `@flue/sdk` + `just-bash` → vercel-labs) and run. No model
-credentials were available in the sandbox, so none could emit a real haiku — but
-the three modern artifacts each executed cleanly right up to the model call.
+Flue separates a workflow (a `run` export, one finite invocation that returns)
+from an agent (a default `createAgent`, a continuing instance addressed by id).
+This port carries both, alongside the Eve agent:
 
-The deliverable is **three artifacts** (plus the museum-piece original):
+| Artifact | File | Driven by |
+|---|---|---|
+| **Flue workflow** | `flue/src/workflows/haiku.ts` | `flue run haiku --payload '{"theme":"…"}'` |
+| **Flue agent** | `flue/src/agents/haiku-chat.ts` | `flue connect haiku-chat <id>` |
+| **Eve agent** | `eve/agent/` | `POST /eve/v1/session` (or the `eve dev` TUI) |
 
-| Artifact | File | Driven by | Result |
-|---|---|---|---|
-| **Flue workflow** | `flue/src/workflows/haiku.ts` (exports `run`) | `flue run haiku --target node` | ✓ discovered in `src/workflows/`, got a runId, ran to the prompt → `No API key for provider: anthropic` |
-| **Flue agent** | `flue/src/agents/haiku-chat.ts` (default `createAgent`) | `flue connect haiku-chat <id>` | ✓ discovered in `src/agents/`, connected, processed the submission → `No API key for provider: anthropic` |
-| **Eve agent** | `eve/agent/` (directory) | `POST /eve/v1/session` on the built server | ✓ compiled 0 errors, full session lifecycle streamed → `MODEL_CALL_FAILED` (AI Gateway 401) |
-| _original (old Flue)_ | `original/haiku.ts` | _n/a_ | ✗ `import '@flue/sdk/client'` → `ERR_PACKAGE_PATH_NOT_EXPORTED`; today's `@flue/sdk` exports `createFlueClient` (an HTTP client), not the `FlueContext`/`init` the gist needs. Entry shape matches no current runtime. |
+## Run results (executed 2026-06-20)
 
-The Flue **workflow** vs **agent** split is the same distinction discussed
-elsewhere in this repo: a workflow is a one-shot `run` you invoke and that
-returns; an agent is a continuing instance you address by id (`haiku-chat/<id>`)
-and converse with. Same model + local sandbox; different lifecycle.
+Installed from the published packages (`@flue/runtime` → withastro/flue, `eve` →
+vercel/eve) and run. The sandbox had no model credentials, so none emitted a
+haiku; each reached the model call and stopped there.
 
-Running it surfaced a **real bug the docs-only version had**: Eve's just-bash
-backend import is `eve/sandbox/just-bash` (hyphenated), not `eve/sandbox/justbash`.
-Eve also hard-requires Node >= 24 (Flue is happy on 22.19+).
+| Artifact | Result |
+|---|---|
+| Flue workflow | ✓ discovered in `src/workflows/`, got a runId, ran to the prompt → `No API key for provider: anthropic` |
+| Flue agent | ✓ discovered in `src/agents/`, connected, processed the submission → `No API key for provider: anthropic` |
+| Eve agent | ✓ compiled 0 errors, full session lifecycle streamed → `MODEL_CALL_FAILED` (AI Gateway 401) |
 
-Net: "structurally correct, blocked only on credentials" for the two modern
-ports; the original is a museum piece — kept for the run attempt, not buildable.
+Running the Eve port caught a real bug: the just-bash backend import is
+`eve/sandbox/just-bash` (hyphenated); `eve/sandbox/justbash` throws
+`ERR_PACKAGE_PATH_NOT_EXPORTED`. Eve requires Node >= 24; Flue runs on 22.19+.
 
-## Is there code reuse between the three?
+## Is there code reuse between the artifacts?
 
-Essentially **none at the code level** — they are three independent projects with
-separate `package.json`s, dependency trees, and framework APIs; nothing is
-imported across them. What's actually shared is *content*, not *code*:
+None at the code level: three artifacts across two projects, with separate
+`package.json` files and APIs, and nothing imported across them. What recurs is
+data and prose, re-expressed for each surface:
 
-- **The prompt string** (`Write a fresh original haiku… 5-7-5… Random seed…`) is
-  copy-pasted verbatim into all three. This is the only literal reuse.
-- **The output contract** `{ theme, haiku[], note }` is re-declared in each:
-  valibot in the original and in `flue/`, **zod** in `eve/`. Same shape, three
-  declarations, two libraries.
-- **The model id** is the same model, spelled `claude-haiku-4-5` (Flue) vs
+- The output shape `{ theme, haiku[], note }` is declared with valibot in the
+  Flue workflow and with zod in the Eve tool. The Flue agent states it in prose.
+- The haiku rules (3 lines, 5-7-5, don't reuse wording) appear in all three,
+  reworded per surface rather than copied.
+- The model is the same, spelled `claude-haiku-4-5` (Flue) and
   `claude-haiku-4.5` (Eve).
 
-Everything structural — how the agent is described, how it's triggered, how the
-sandbox is wired, how structured output is captured — is framework-specific and
-cannot be shared. The orchestration in `flue/` (a `run` export that `init`s an
-agent and calls `prompt(..., { result })`) has no counterpart in `eve/`, where
-the same job is spread across `agent.ts` + `instructions.md` + a tool's
-`outputSchema`. The portable surface of "the same bot" turned out to be just a
-prompt and a data shape; the wiring doesn't travel.
+How the agent is described, triggered, and sandboxed, and how structured output
+is captured, is framework-specific. The Flue workflow's `run` export that inits
+an agent and calls `prompt(..., { result })` has no Eve counterpart; Eve spreads
+the same job across `agent.ts`, `instructions.md`, and `tools/compose_haiku.ts`.
+The portable surface is a data shape and a few rules; the wiring does not
+transfer.
 
 ## What we learned
 
-1. **Modern Flue is the same idea, refactored, not reinvented.** The old gist
-   fused "what the agent is" and "how this call runs" into one function and
-   bolted on its own sandbox. Modern Flue separates those (`createAgent` vs the
-   `run` export) and ships the sandbox in the box — so the `just-bash` /
-   `InMemoryFs` plumbing and the `@flue/sdk/client` import just disappear. The
-   actual haiku prompt + valibot schema port over almost verbatim.
+1. **Flue splits config from invocation.** `createAgent(...)` holds the model,
+   cwd, and sandbox; a `run` export drives one call through the FlueContext. The
+   folder sets the role: a `run` export under `src/workflows/`, a default
+   `createAgent` export under `src/agents/`.
 
-2. **Eve is a different mental model, not a different API.** You don't write a
-   function that builds an agent; you lay out a directory and Eve *is* the
-   agent. Instructions, the model, the structured contract, and the trigger
-   each move to their own file (`instructions.md`, `agent.ts`,
-   `tools/compose_haiku.ts`, `sandbox.ts`). Nothing registers anything;
-   location is the API.
+2. **Eve makes the directory the agent.** The model is `agent.ts`, the system
+   prompt is `instructions.md`, structured output is a tool under `tools/`, the
+   sandbox is `sandbox.ts`. Eve maps each by path, so nothing registers anything.
 
-3. **"Structured output" stops being a prompt argument.** Flue attaches a
-   schema to a single `prompt()` call. Eve has no single call to attach to — the
-   agent runs an instructions-driven loop — so the typed contract has to live in
-   a **tool's `outputSchema`**, and the instructions must tell the model to call
-   that tool exactly once. Same guarantee, very different place.
+3. **Structured output attaches in different places.** Flue passes a valibot
+   schema to one `prompt()` call and reads `response.data`. Eve has no single
+   call to attach to: the agent runs a message loop, so the zod schema lives on
+   a tool's `outputSchema`, and `instructions.md` tells the model to call that
+   tool once.
 
-4. **CLI triggering looks different in each.** Flue treats a one-shot job as a
-   *workflow*: drop the webhook trigger entirely and run
-   `npx flue run haiku --payload '{"theme":"…"}'`, which executes locally
-   without HTTP ingress. Eve has no one-shot run command — its CLI surface is
-   the interactive **dev TUI** (`npx eve dev`), where you type a message and
-   watch the agent work. (The HTTP channel stays on by default, but it's no
-   longer the intended entry point, so the custom webhook channel is gone.)
+4. **CLI entry differs by shape.** A Flue workflow runs once:
+   `flue run haiku --payload '{"theme":"…"}'` invokes `run()` without an HTTP
+   route. A Flue agent is a conversation: `flue connect haiku-chat <id>`. Eve's
+   CLI is the `npx eve dev` TUI, with the HTTP session API
+   (`POST /eve/v1/session`) staying on for non-interactive calls.
 
-5. **"Local sandbox" is one call in both — and circles back to the original.**
-   Flue: `sandbox: local()` from `@flue/runtime/node` runs against the host FS.
-   Eve: `defineSandbox({ backend: justbash() })` pins the pure-local in-process
-   backend — which is the very same `just-bash` engine the 2024 gist wired up
-   by hand. The frameworks absorbed what HaikuBot used to do manually.
+5. **The local sandbox is one call each.** Flue: `sandbox: local()` from
+   `@flue/runtime/node` runs shell and fs against the host. Eve:
+   `defineSandbox({ backend: justbash() })` runs just-bash in-process, needing
+   no Docker daemon and no network.
 
-6. **Small porting hazards are in the spelling, not the structure.** Flue's
-   routing strings use dashes (`claude-haiku-4-5`); Eve's docs use dots
-   (`claude-haiku-4.5`). And the schema library flips valibot → zod. Easy to
-   miss, annoying to debug.
+6. **Two spellings to watch.** The model id uses dashes in Flue
+   (`claude-haiku-4-5`) and a dot in Eve (`claude-haiku-4.5`); the gateway
+   resolves that string at the model call, so a wrong spelling fails at runtime,
+   not at compile time. The schema library also flips: valibot in Flue, zod in
+   Eve.
 
-## Honesty about fidelity
+## Fidelity
 
-Originally written from docs; since **actually installed and run** (see Run
-results above), which resolved both previously-inferred spots:
-
-- the `flue run haiku --target node` ↔ `src/workflows/` discovery wiring is
-  **confirmed** — the CLI found and ran the workflow;
-- Eve's backend import was **wrong** in the docs-only version
-  (`eve/sandbox/justbash`) and is now fixed to the real subpath
-  `eve/sandbox/just-bash`, verified against eve@0.11.8's package exports.
-
-Remaining unverified: neither modern port produced an actual haiku, because the
-sandbox had no model credentials (Anthropic key for Flue; Vercel AI Gateway
-token for Eve). Both reached the model call and failed only on auth.
+Written from docs, then installed and run. The run confirmed the
+`flue run haiku --target node` ↔ `src/workflows/` discovery and corrected the
+Eve backend import to `eve/sandbox/just-bash` (checked against eve@0.11.8).
+Unverified: neither port produced an actual haiku, because the sandbox had no
+model credentials (an Anthropic key for Flue, a Vercel AI Gateway token for
+Eve). Both reached the model call and failed only on auth.
