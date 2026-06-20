@@ -1,19 +1,18 @@
 import { createAgent } from '@flue/runtime';
 import { local } from '@flue/runtime/node';
 
-// HaikuBot as a Flue *agent* (contrast with src/workflows/haiku.ts).
+// HaikuBot as a Flue agent. Compare src/workflows/haiku.ts, which exports run().
 //
-// An agent is a file in src/agents/ whose DEFAULT export is createAgent(...).
-// Unlike the workflow — a one-shot `run` you call and that returns — this is a
-// continuing, addressable instance: you reach a specific conversation by id and
-// it keeps context across turns. Reach it via the dev server's HTTP route
-//   POST /agents/haiku-chat/<id>
-// or interactively with
-//   npx flue connect haiku-chat <id>
+// An agent is a file in src/agents/ whose default export is createAgent(...).
+// Flue serves it at POST /agents/haiku-chat/<id>; each <id> is its own
+// conversation whose session history Flue persists, so turn N sees turns 1..N-1.
+// A workflow keeps no such state: run() executes once and returns a value.
 //
-// Same model + local sandbox as the workflow; the difference is purely
-// lifecycle (continuing instance vs finite job), so the behaviour that was
-// inline in the workflow's prompt() lives here as persistent `instructions`.
+// Run a local instance: npx flue connect haiku-chat <id>
+//
+// Model and sandbox match the workflow. Because the reply depends on earlier
+// turns, the rules the workflow passed inline to prompt() are persistent
+// `instructions` here instead.
 export default createAgent(() => ({
   model: 'anthropic/claude-haiku-4-5',
   sandbox: local(),

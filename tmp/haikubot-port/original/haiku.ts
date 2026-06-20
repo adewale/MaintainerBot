@@ -1,4 +1,6 @@
-// Verbatim recreation of the original gist (old Flue) for the run attempt.
+// The original gist (old Flue), recreated verbatim so it can be installed and
+// run against current packages. Doing so is how we found `@flue/sdk/client` no
+// longer resolves (ERR_PACKAGE_PATH_NOT_EXPORTED).
 import type { FlueContext } from '@flue/sdk/client';
 import { Bash, InMemoryFs } from 'just-bash';
 import * as v from 'valibot';

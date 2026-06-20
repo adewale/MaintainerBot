@@ -3,13 +3,14 @@ import { justbash } from "eve/sandbox/just-bash";
 
 // Local sandbox for HaikuBot.
 //
-// Eve's default sandbox auto-picks a backend (Vercel Sandbox / Docker /
-// microsandbox / just-bash). Pinning `justbash()` forces the pure-local,
-// in-process backend — no Docker, no remote — which also happens to be the
-// same engine the original gist used by hand (`just-bash` + `InMemoryFs`).
+// Eve's default backend is whichever of Vercel Sandbox, Docker, microsandbox,
+// or just-bash it resolves first. Pinning justbash() runs the sandbox in this
+// Node process, so it needs no Docker daemon and no network call. It is the
+// same engine the original gist imported directly (`just-bash` + `InMemoryFs`).
 //
-// Subpath is `eve/sandbox/just-bash` (hyphenated) exporting `justbash` —
-// verified against eve@0.11.8's package exports.
+// The subpath is `eve/sandbox/just-bash` (hyphenated) and exports `justbash`.
+// `eve/sandbox/justbash` throws ERR_PACKAGE_PATH_NOT_EXPORTED; checked against
+// eve@0.11.8.
 export default defineSandbox({
   backend: justbash(),
 });

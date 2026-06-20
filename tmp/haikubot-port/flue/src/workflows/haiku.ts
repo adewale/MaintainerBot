@@ -4,27 +4,24 @@ import * as v from 'valibot';
 
 // HaikuBot — modern Flue port.
 //
-// The old gist did everything inside one `export default async function`:
-// it imported `FlueContext` from '@flue/sdk/client', hand-rolled a sandbox out
-// of `just-bash` + `InMemoryFs`, then called `init({ sandbox, cwd, model })`
-// to build the agent on the fly.
+// The old gist packed everything into one `export default async function`: it
+// imported `FlueContext` from '@flue/sdk/client', built a sandbox from
+// `just-bash` + `InMemoryFs`, then called `init({ sandbox, cwd, model })`.
 //
-// Modern Flue (`@flue/runtime`, Node >= 22.19) splits those two jobs:
-//   1. createAgent(...)  — *describe* the agent (model, cwd, sandbox).
-//   2. the `run` export  — *drive* a single invocation via the FlueContext.
+// Modern Flue (`@flue/runtime`, Node >= 22.19) splits that into two exports:
+//   1. createAgent(...): the agent's config (model, cwd, sandbox).
+//   2. run(...): one invocation, receiving the agent via FlueContext.
 //
-// Layout: a one-shot "generate a haiku" job is a *workflow*, so per Flue
-// convention this file lives in src/workflows/ and exports `run(...)`. (An
-// agent would instead live in src/agents/ with a default export of
-// createAgent.) The folder name is how Flue tells the two apart.
+// This file exports run(), so Flue treats it as a workflow and requires it
+// under src/workflows/. An agent would be a default createAgent export under
+// src/agents/. Flue reads the folder name to decide which it is.
 //
-// Triggering: driven from the CLI rather than a webhook — no
-// `export const triggers = { webhook: true }`; invoke it with
-//   npx flue run haiku --payload '{"theme":"autumn rain"}'
-// which runs locally without going through HTTP ingress.
+// No `export const triggers = { webhook: true }`: a workflow is reached by
+// `npx flue run haiku --payload '{"theme":"autumn rain"}'`, which invokes run()
+// directly without registering an HTTP route.
 //
-// Sandbox: `local()` (from @flue/runtime/node) runs the agent against the host
-// filesystem under `cwd`, replacing the in-memory virtual sandbox.
+// `local()` (from @flue/runtime/node) executes shell and fs against the host
+// filesystem under `cwd`, in place of the default in-memory sandbox.
 
 const haikuBot = createAgent(() => ({
   model: 'anthropic/claude-haiku-4-5',
