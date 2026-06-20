@@ -7,6 +7,7 @@ three frameworks.
 | | Original gist (old Flue) | `flue/` (modern Flue) | `eve/` (Eve) |
 |---|---|---|---|
 | Package | `@flue/sdk/client` | `@flue/runtime` + `@flue/cli` | `eve` + `ai` + `zod` |
+| File | `haiku.ts` | `src/workflows/haiku.ts` (workflow → `run` export) | `agent/` directory |
 | Shape | one `export default async fn` | `createAgent()` + `run` export | a **directory** of files |
 | Sandbox | hand-rolled `just-bash` + `InMemoryFs` | **local** sandbox: `local()` from `@flue/runtime/node` | **local** sandbox: `defineSandbox({ backend: justbash() })` |
 | Structured output | `valibot` schema on `session.prompt(..., { result })` | same, returned on `response.data` | tool `outputSchema` (Zod) |

@@ -13,9 +13,13 @@ import * as v from 'valibot';
 //   1. createAgent(...)  — *describe* the agent (model, cwd, sandbox).
 //   2. the `run` export  — *drive* a single invocation via the FlueContext.
 //
-// Triggering: this is a one-shot "generate a haiku" job, so it's a workflow
-// driven from the CLI rather than a webhook. There is no
-// `export const triggers = { webhook: true }`; instead you invoke it with
+// Layout: a one-shot "generate a haiku" job is a *workflow*, so per Flue
+// convention this file lives in src/workflows/ and exports `run(...)`. (An
+// agent would instead live in src/agents/ with a default export of
+// createAgent.) The folder name is how Flue tells the two apart.
+//
+// Triggering: driven from the CLI rather than a webhook — no
+// `export const triggers = { webhook: true }`; invoke it with
 //   npx flue run haiku --payload '{"theme":"autumn rain"}'
 // which runs locally without going through HTTP ingress.
 //
