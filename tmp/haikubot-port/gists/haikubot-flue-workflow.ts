@@ -1,3 +1,20 @@
+// HaikuBot — Flue WORKFLOW (single-file reading copy)
+//
+// One of three sibling gists: Flue workflow, Flue agent, Eve agent. This file
+// concatenates every part of the Flue *workflow* artifact so you can read the
+// whole thing in one place. It is NOT meant to compile or run — each section
+// below is a separate file in a real project, marked by a boxed FILE banner.
+//
+// What it is: a one-shot job. `flue run haiku` calls run() once, which generates
+// a 5-7-5 haiku for a theme and returns a structured { theme, haiku[], note }.
+// A workflow is the "call it and it returns" half of Flue; the agent gist is the
+// "keep talking to it" half.
+
+
+// ============================================================================
+// ===  FILE 1/3  —  src/workflows/haiku.ts   (the workflow)
+// ============================================================================
+
 import { createAgent, type FlueContext } from '@flue/runtime';
 import { local } from '@flue/runtime/node';
 import * as v from 'valibot';
@@ -57,3 +74,37 @@ Rules:
   // fully typed, on response.data.
   return response.data;
 }
+
+
+// ============================================================================
+// ===  FILE 2/3  —  flue.config.ts   (build target)
+// ============================================================================
+
+import { defineConfig } from '@flue/cli/config';
+
+export default defineConfig({ target: 'node' });
+
+
+// ============================================================================
+// ===  FILE 3/3  —  package.json   (JSON, not TypeScript — shown for context)
+// ============================================================================
+/*
+{
+  "name": "haikubot-flue-workflow",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22.19.0"
+  },
+  "scripts": {
+    "haiku": "flue run haiku --payload '{\"theme\":\"the present moment\"}'"
+  },
+  "dependencies": {
+    "@flue/runtime": "^1.0.0-beta.2",
+    "valibot": "^1.4.1"
+  },
+  "devDependencies": {
+    "@flue/cli": "^1.0.0-beta.1"
+  }
+}
+*/
