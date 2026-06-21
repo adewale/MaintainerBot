@@ -1,0 +1,10 @@
+{
+  "name": "haikubot-eve-agent",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "ai": "^7.0.0-beta.178",
+    "eve": "^0.11.8",
+    "zod": "^4.4.3"
+  }
+}
