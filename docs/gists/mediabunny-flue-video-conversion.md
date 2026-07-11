@@ -16,7 +16,7 @@ The important Flue idea: **the sandbox is just a strategy**. Start with Just Bas
 ## `.flue/workflows/video-convert.ts`
 
 ```ts
-import { bash, createAgent, type FlueContext, type WorkflowRouteHandler } from '@flue/runtime';
+import { bash, defineAgent, defineWorkflow, type FlueHarness, type WorkflowRouteHandler } from '@flue/runtime';
 import { Bash, InMemoryFs } from 'just-bash';
 import * as v from 'valibot';
 
@@ -32,6 +32,21 @@ type R2BucketLike = {
   put(key: string, value: string | ArrayBuffer | ArrayBufferView | ReadableStream, options?: { httpMetadata?: { contentType?: string } }): Promise<unknown>;
 };
 
+type VideoEnv = Record<string, any> & {
+  MEDIA_R2?: R2BucketLike;
+  MEDIA_GATEWAY_ORIGIN?: string;
+};
+
+const workflowEnvs = new Map<string, VideoEnv>();
+
+function workflowEnvFor(harness: FlueHarness) {
+  const runId = (harness as unknown as { instanceId?: string }).instanceId;
+  if (!runId) throw new Error('Unable to resolve workflow run id from Flue harness.');
+  const env = workflowEnvs.get(runId);
+  if (!env) throw new Error(`Missing platform environment for workflow run ${runId}.`);
+  return { runId, env };
+}
+
 const PayloadSchema = v.object({
   inputKey: v.string(),              // R2 key for the uploaded source video
   outputKey: v.string(),             // R2 key for the converted video
@@ -46,19 +61,27 @@ const PayloadSchema = v.object({
 
 type VideoPayload = v.InferOutput<typeof PayloadSchema>;
 
-const videoWorker = createAgent<VideoPayload, Record<string, any>>(() => ({
-  sandbox: bash(makeJustBashPseudoSandbox()),
-  cwd: '/workspace',
-  model: false, // Conversion is deterministic; no LLM needed for the worker step.
-}));
+const videoWorker = defineAgent<VideoEnv>(({ id, env }) => {
+  workflowEnvs.set(id, env);
+  return {
+    sandbox: bash(makeJustBashPseudoSandbox()),
+    cwd: '/workspace',
+    // Flue requires an agent model even for deterministic workflows; this run path does not prompt it.
+    model: String(env.FLUE_MODEL || 'anthropic/claude-haiku-4-5'),
+  };
+});
 
-export async function run({ init, env, payload }: FlueContext<VideoPayload>) {
-  const args = v.parse(PayloadSchema, payload);
-  const bucket = env.MEDIA_R2 as R2BucketLike | undefined;
-  if (!bucket) throw new Error('MEDIA_R2 binding is required');
+export default defineWorkflow({
+  agent: videoWorker,
+  input: PayloadSchema,
+  async run({ harness, input: args }) {
+    const { runId, env } = workflowEnvFor(harness);
+    try {
+      const bucket = env.MEDIA_R2 as R2BucketLike | undefined;
+      if (!bucket) throw new Error('MEDIA_R2 binding is required');
 
-  const mode = args.mode ?? 'mock';
-  const format = args.format ?? (args.outputKey.endsWith('.webm') ? 'webm' : 'mp4');
+      const mode = args.mode ?? 'mock';
+      const format = args.format ?? (args.outputKey.endsWith('.webm') ? 'webm' : 'mp4');
 
   /**
    * This is the only thing you need to swap to ship somewhere useful.
@@ -77,8 +100,7 @@ export async function run({ init, env, payload }: FlueContext<VideoPayload>) {
    * The agent contract stays the same: the sandbox receives a job and produces
    * an output artifact. R2 remains the durable input/output store.
    */
-  const harness = await init(videoWorker);
-  const session = await harness.session('convert');
+      const session = await harness.session('convert');
 
   await session.shell('mkdir -p /workspace/in /workspace/out /workspace/scripts');
 
@@ -229,8 +251,12 @@ EOF`);
   await bucket.put(args.outputKey.replace(/\.[^.]+$/, '.success.json'), JSON.stringify(parsed, null, 2), {
     httpMetadata: { contentType: 'application/json' },
   });
-  return parsed;
-}
+      return parsed;
+    } finally {
+      workflowEnvs.delete(runId);
+    }
+  },
+});
 
 function makeJustBashPseudoSandbox() {
   const fs = new InMemoryFs();

@@ -1,16 +1,23 @@
-import { createAgent, registerProvider, type FlueContext, type FlueSession, type WorkflowRouteHandler } from '@flue/runtime';
+import { defineAgent, defineWorkflow, registerProvider, type FlueHarness, type FlueSession, type WorkflowRouteHandler } from '@flue/runtime';
 import * as v from 'valibot';
 
 export const route: WorkflowRouteHandler = async (c, next) => {
 	const configuredSecret = (c.env as MaintainerEnv | undefined)?.MAINTAINERBOT_WEBHOOK_SECRET;
 	if (configuredSecret) {
-		const body = await c.req.raw.clone().json().catch(() => null) as DailyPayload | null;
+		const body = (await c.req.raw
+			.clone()
+			.json()
+			.catch(() => null)) as DailyPayload | null;
 		if (body?.webhookSecret !== configuredSecret) return c.json({ ok: false, error: 'Unauthorized' }, 401);
 	}
 	await next();
 };
 
-type DailyPayload = { webhookSecret?: string } | undefined;
+const DailyPayloadSchema = v.object({
+	webhookSecret: v.optional(v.string()),
+});
+
+type DailyPayload = v.InferOutput<typeof DailyPayloadSchema>;
 
 type MaintainerEnv = Record<string, any> & {
 	MAINTAINERBOT_R2?: R2BucketLike;
@@ -155,7 +162,13 @@ type ContextSummary = {
 		missingCi: string[];
 		missingTests: string[];
 	};
-	projectContextRefs: Array<{ repo: string; inputHash: string; stateFingerprint: string; rebuiltThisRun: boolean; r2Key: string }>;
+	projectContextRefs: Array<{
+		repo: string;
+		inputHash: string;
+		stateFingerprint: string;
+		rebuiltThisRun: boolean;
+		r2Key: string;
+	}>;
 };
 
 type MaintenanceReport = {
@@ -187,13 +200,16 @@ type MaintenanceReport = {
 type ContextIndex = {
 	version: 1;
 	lastRunAt: string;
-	projects: Record<string, {
-		stateFingerprint: string;
-		inputHash: string;
-		latestContextKey: string;
-		latestAuditKey?: string;
-		lastBuiltAt: string;
-	}>;
+	projects: Record<
+		string,
+		{
+			stateFingerprint: string;
+			inputHash: string;
+			latestContextKey: string;
+			latestAuditKey?: string;
+			lastBuiltAt: string;
+		}
+	>;
 };
 
 type PreparedContexts = {
@@ -309,123 +325,160 @@ Rules:
 - Verify fixes with tests, builds, or clear static checks.
 - If evidence is weak, recommend investigation instead of making a change.`;
 
-const maintainerAgent = createAgent<DailyPayload, MaintainerEnv>(({ env }) => {
+const workflowEnvs = new Map<string, MaintainerEnv>();
+
+function workflowEnvFor(harness: FlueHarness) {
+	const runId = (harness as unknown as { instanceId?: string }).instanceId;
+	if (!runId) throw new Error('Unable to resolve workflow run id from Flue harness.');
+	const env = workflowEnvs.get(runId);
+	if (!env) throw new Error(`Missing platform environment for workflow run ${runId}.`);
+	return { runId, env };
+}
+
+const maintainerAgent = defineAgent<MaintainerEnv>(({ id, env }) => {
+	workflowEnvs.set(id, env);
 	configureProviderOverrides(env);
-	const model = selectedModel(env);
 	return {
 		cwd: '/workspace',
-		model: model === 'none' ? false : model,
+		model: String(env.FLUE_MODEL || defaultModel(env)),
 		instructions: MAINTAINER_INSTRUCTIONS,
 	};
 });
 
-export async function run({ init, env, payload }: FlueContext<DailyPayload, MaintainerEnv>) {
-	const configuredSecret = env.MAINTAINERBOT_WEBHOOK_SECRET;
-	if (configuredSecret && payload?.webhookSecret !== configuredSecret) return { ok: false, error: 'Unauthorized' };
+export default defineWorkflow({
+	agent: maintainerAgent,
+	input: DailyPayloadSchema,
+	async run({ harness, input: payload }) {
+		const { runId: workflowRunId, env } = workflowEnvFor(harness);
+		try {
+			const configuredSecret = env.MAINTAINERBOT_WEBHOOK_SECRET;
+			if (configuredSecret && payload.webhookSecret !== configuredSecret) return { ok: false, error: 'Unauthorized' };
 
-	const hasModel = hasLlmCredentials(env);
-	const model = selectedModel(env);
-	const harness = await init(maintainerAgent);
-	const session = await harness.session();
+			const hasModel = hasLlmCredentials(env);
+			const model = selectedModel(env);
+			const session = await harness.session();
 
-	const owner = String(env.GITHUB_OWNER || 'adewale');
-	const reportsBucket = env.MAINTAINERBOT_R2 as R2BucketLike | undefined;
-	const githubHeaders: Record<string, string> = {
-		Accept: 'application/vnd.github+json',
-		'User-Agent': 'MaintainerBot',
-	};
-	if (env.GITHUB_TOKEN) githubHeaders.Authorization = `Bearer ${env.GITHUB_TOKEN}`;
+			const owner = String(env.GITHUB_OWNER || 'adewale');
+			const reportsBucket = env.MAINTAINERBOT_R2 as R2BucketLike | undefined;
+			const githubHeaders: Record<string, string> = {
+				Accept: 'application/vnd.github+json',
+				'User-Agent': 'MaintainerBot',
+			};
+			if (env.GITHUB_TOKEN) githubHeaders.Authorization = `Bearer ${env.GITHUB_TOKEN}`;
 
-	const rejections = await readOrSeedR2(reportsBucket, 'data/rejections.json', DEFAULT_REJECTIONS, 'application/json');
-	const lessons = await readOrSeedR2(reportsBucket, 'data/lessons.md', DEFAULT_LESSONS, 'text/markdown; charset=utf-8');
-	const rejected = rejectedFingerprints(rejections);
+			const rejections = await readOrSeedR2(reportsBucket, 'data/rejections.json', DEFAULT_REJECTIONS, 'application/json');
+			const lessons = await readOrSeedR2(reportsBucket, 'data/lessons.md', DEFAULT_LESSONS, 'text/markdown; charset=utf-8');
+			const rejected = rejectedFingerprints(rejections);
 
-	await harness.fs.writeFile('/workspace/data/rejections.json', rejections);
-	await harness.fs.writeFile('/workspace/data/lessons.md', lessons);
+			await harness.fs.writeFile('/workspace/data/rejections.json', rejections);
+			await harness.fs.writeFile('/workspace/data/lessons.md', lessons);
 
-	const cutoff = DEFAULT_CUTOFF;
-	const baseRepos = (await fetchRepos(owner, githubHeaders)).filter((repo) => repo.pushedAt && repo.pushedAt >= cutoff);
-	const repoNames = new Set(baseRepos.map((repo) => repo.fullName));
-	const issues = (await fetchSearchItems(`user:${owner} is:issue is:open`, githubHeaders)).filter((item) => repoNames.has(item.repo));
-	const pullRequests = (await fetchSearchItems(`user:${owner} is:pr is:open`, githubHeaders)).filter((item) => repoNames.has(item.repo));
+			const cutoff = DEFAULT_CUTOFF;
+			const baseRepos = (await fetchRepos(owner, githubHeaders)).filter((repo) => repo.pushedAt && repo.pushedAt >= cutoff);
+			const repoNames = new Set(baseRepos.map((repo) => repo.fullName));
+			const issues = (await fetchSearchItems(`user:${owner} is:issue is:open`, githubHeaders)).filter((item) => repoNames.has(item.repo));
+			const pullRequests = (await fetchSearchItems(`user:${owner} is:pr is:open`, githubHeaders)).filter((item) => repoNames.has(item.repo));
 
-	const generatedAt = new Date().toISOString();
-	const runId = generatedAt.replace(/[:.]/g, '-');
-	const prepared = await prepareProjectContexts({
-		bucket: reportsBucket,
-		baseRepos,
-		issues,
-		pullRequests,
-		rejected,
-		lessons,
-		generatedAt,
-		headers: githubHeaders,
-		owner,
-	});
-	const repos = prepared.repos;
-	await harness.fs.writeFile('/workspace/reports/repo-summary.json', `${JSON.stringify(repos, null, 2)}\n`);
-	const deterministic = buildDeterministicReport(repos, issues, pullRequests, rejected);
-	const projectContexts = await finalizeProjectContexts({
-		bucket: reportsBucket,
-		prepared,
-		repos,
-		issues,
-		pullRequests,
-		recommendations: deterministic.recommendations,
-		rejected,
-		lessons,
-		generatedAt,
-	});
-
-	const llmAudits = hasModel
-		? await auditChangedProjects({
+			const generatedAt = new Date().toISOString();
+			const runId = generatedAt.replace(/[:.]/g, '-');
+			const prepared = await prepareProjectContexts({
 				bucket: reportsBucket,
-				session,
-				projectContexts,
+				baseRepos,
+				issues,
+				pullRequests,
 				rejected,
 				lessons,
 				generatedAt,
+				headers: githubHeaders,
+				owner,
+			});
+			const repos = prepared.repos;
+			await harness.fs.writeFile('/workspace/reports/repo-summary.json', `${JSON.stringify(repos, null, 2)}\n`);
+			const deterministic = buildDeterministicReport(repos, issues, pullRequests, rejected);
+			const projectContexts = await finalizeProjectContexts({
+				bucket: reportsBucket,
+				prepared,
+				repos,
+				issues,
+				pullRequests,
+				recommendations: deterministic.recommendations,
+				rejected,
+				lessons,
+				generatedAt,
+			});
+
+			const llmAudits = hasModel
+				? await auditChangedProjects({
+						bucket: reportsBucket,
+						session,
+						projectContexts,
+						rejected,
+						lessons,
+						generatedAt,
+						model,
+					})
+				: await loadExistingProjectAudits(reportsBucket, projectContexts, generatedAt);
+			const auditRecommendations = llmAudits.results.flatMap((audit) => audit.recommendations).filter((item) => !rejected.has(item.fingerprint));
+			const contextSummary = buildContextSummary({
+				repos,
+				projectContexts,
+				prepared,
+				llmConfigured: hasModel,
+			});
+			const runContext = buildRunContextBundle({
+				runId,
+				generatedAt,
+				owner,
+				cutoff,
 				model,
-			})
-		: await loadExistingProjectAudits(reportsBucket, projectContexts, generatedAt);
-	const auditRecommendations = llmAudits.results.flatMap((audit) => audit.recommendations).filter((item) => !rejected.has(item.fingerprint));
-	const contextSummary = buildContextSummary({ repos, projectContexts, prepared, llmConfigured: hasModel });
-	const runContext = buildRunContextBundle({ runId, generatedAt, owner, cutoff, model, repos, issues, pullRequests, deterministic, projectContexts, llmAudits });
-	if (reportsBucket) await writeRunContextBundle(reportsBucket, runContext);
-	const llmReport = hasModel ? await synthesizeRunReport(session, runContext, rejected, lessons) : null;
-	const llmProjectRecommendations = llmReport?.projectRecommendations.filter((item) => !rejected.has(item.fingerprint)) ?? [];
-	const manualActionCandidates = llmReport?.draftPrCandidates.filter((item) => !rejected.has(item.fingerprint)) ?? [];
-	const mergedRecommendations = [...llmProjectRecommendations, ...auditRecommendations, ...deterministic.recommendations];
+				repos,
+				issues,
+				pullRequests,
+				deterministic,
+				projectContexts,
+				llmAudits,
+			});
+			if (reportsBucket) await writeRunContextBundle(reportsBucket, runContext);
+			const llmReport = hasModel ? await synthesizeRunReport(session, runContext, rejected, lessons) : null;
+			const llmProjectRecommendations = llmReport?.projectRecommendations.filter((item) => !rejected.has(item.fingerprint)) ?? [];
+			const manualActionCandidates = llmReport?.draftPrCandidates.filter((item) => !rejected.has(item.fingerprint)) ?? [];
+			const mergedRecommendations = [...llmProjectRecommendations, ...auditRecommendations, ...deterministic.recommendations];
 
-	const report: MaintenanceReport = {
-		ok: true,
-		mode: hasModel ? 'llm-assisted' : 'context-only-no-model',
-		runId,
-		promptVersion: hasModel ? RUN_SYNTHESIS_PROMPT_VERSION : 'no-llm-context-summary-v1',
-		model,
-		contextSummary,
-		owner,
-		repoCount: repos.length,
-		generatedAt,
-		...deterministic,
-		summary: llmReport?.summary ?? `LLM is not configured. Built and stored ${projectContexts.length} project context bundle(s); showing deterministic facts and context summary only.`,
-		priorityActions: llmReport?.priorityActions ?? deterministic.priorityActions.filter((action) => /issue|PR|TODO|failed|stale/i.test(action)),
-		recommendations: mergedRecommendations,
-		projectRecommendations: [...llmProjectRecommendations, ...auditRecommendations],
-		draftPrCandidates: hasModel ? manualActionCandidates : [],
-		sharedLessons: llmReport?.sharedLessons ?? deterministic.sharedLessons,
-		llmAudits,
-	};
+			const report: MaintenanceReport = {
+				ok: true,
+				mode: hasModel ? 'llm-assisted' : 'context-only-no-model',
+				runId,
+				promptVersion: hasModel ? RUN_SYNTHESIS_PROMPT_VERSION : 'no-llm-context-summary-v1',
+				model,
+				contextSummary,
+				owner,
+				repoCount: repos.length,
+				generatedAt,
+				...deterministic,
+				summary:
+					llmReport?.summary ??
+					`LLM is not configured. Built and stored ${projectContexts.length} project context bundle(s); showing deterministic facts and context summary only.`,
+				priorityActions: llmReport?.priorityActions ?? deterministic.priorityActions.filter((action) => /issue|PR|TODO|failed|stale/i.test(action)),
+				recommendations: mergedRecommendations,
+				projectRecommendations: [...llmProjectRecommendations, ...auditRecommendations],
+				draftPrCandidates: hasModel ? manualActionCandidates : [],
+				sharedLessons: llmReport?.sharedLessons ?? deterministic.sharedLessons,
+				llmAudits,
+			};
 
-	report.createdDraftPrs = await maybeCreateDraftPrs(report, repos, env, githubHeaders, reportsBucket);
-	await maybeSendEmail(report, env);
+			report.createdDraftPrs = await maybeCreateDraftPrs(report, repos, env, githubHeaders, reportsBucket);
+			await maybeSendEmail(report, env);
 
-	if (reportsBucket) {
-		const keys = await writeReportToR2(reportsBucket, report);
-		report.r2 = { bucket: 'MAINTAINERBOT_R2', keys };
-	}
-	return report;
-}
+			if (reportsBucket) {
+				const keys = await writeReportToR2(reportsBucket, report);
+				report.r2 = { bucket: 'MAINTAINERBOT_R2', keys };
+			}
+			return report;
+		} finally {
+			workflowEnvs.delete(workflowRunId);
+		}
+	},
+});
 
 async function fetchRepos(owner: string, headers: Record<string, string>): Promise<BaseRepoSummary[]> {
 	const response = await fetch(`https://api.github.com/users/${owner}/repos?per_page=100&sort=updated`, { headers });
@@ -497,10 +550,7 @@ async function fetchRepoHealth(fullName: string, headers: Record<string, string>
 }
 
 async function fetchSearchItems(query: string, headers: Record<string, string>): Promise<WorkItem[]> {
-	const response = await fetch(
-		`https://api.github.com/search/issues?q=${encodeURIComponent(query)}&sort=updated&order=desc&per_page=100`,
-		{ headers },
-	);
+	const response = await fetch(`https://api.github.com/search/issues?q=${encodeURIComponent(query)}&sort=updated&order=desc&per_page=100`, { headers });
 	const text = await response.text();
 	if (!response.ok) return [];
 	return (JSON.parse(text).items ?? []).map((item: any) => {
@@ -551,7 +601,12 @@ async function prepareProjectContexts(options: {
 	owner: string;
 }): Promise<PreparedContexts> {
 	const previousIndex = await readContextIndex(options.bucket);
-	const memoryHash = await sha256(stableJson({ lessons: options.lessons, rejected: [...options.rejected].sort() }));
+	const memoryHash = await sha256(
+		stableJson({
+			lessons: options.lessons,
+			rejected: [...options.rejected].sort(),
+		}),
+	);
 	const repos: RepoSummary[] = [];
 	const projectContexts: ProjectContext[] = [];
 	const rebuilt: string[] = [];
@@ -562,7 +617,11 @@ async function prepareProjectContexts(options: {
 		const previous = previousIndex.projects[repo.fullName];
 		const previousContext = previous?.stateFingerprint === stateFingerprint ? await readJson<ProjectContext>(options.bucket, previous.latestContextKey) : null;
 		if (previousContext) {
-			repos.push({ ...repo, health: previousContext.health, openTodos: previousContext.openTodos });
+			repos.push({
+				...repo,
+				health: previousContext.health,
+				openTodos: previousContext.openTodos,
+			});
 			projectContexts.push({ ...previousContext, rebuiltThisRun: false });
 			reused.push(repo.fullName);
 			continue;
@@ -600,17 +659,25 @@ async function finalizeProjectContexts(options: {
 }
 
 async function projectStateFingerprint(repo: BaseRepoSummary | RepoSummary, issues: WorkItem[], pullRequests: WorkItem[], memoryHash: string) {
-	return sha256(stableJson({
-		repo: repo.fullName,
-		pushedAt: repo.pushedAt,
-		description: repo.description,
-		language: repo.language,
-		defaultBranch: repo.defaultBranch,
-		openIssues: repo.openIssues,
-		issues: issues.filter((issue) => issue.repo === repo.fullName).map((issue) => [issue.number, issue.updatedAt, issue.title, issue.labels]).sort(),
-		pullRequests: pullRequests.filter((pr) => pr.repo === repo.fullName).map((pr) => [pr.number, pr.updatedAt, pr.title, pr.labels]).sort(),
-		memoryHash,
-	}));
+	return sha256(
+		stableJson({
+			repo: repo.fullName,
+			pushedAt: repo.pushedAt,
+			description: repo.description,
+			language: repo.language,
+			defaultBranch: repo.defaultBranch,
+			openIssues: repo.openIssues,
+			issues: issues
+				.filter((issue) => issue.repo === repo.fullName)
+				.map((issue) => [issue.number, issue.updatedAt, issue.title, issue.labels])
+				.sort(),
+			pullRequests: pullRequests
+				.filter((pr) => pr.repo === repo.fullName)
+				.map((pr) => [pr.number, pr.updatedAt, pr.title, pr.labels])
+				.sort(),
+			memoryHash,
+		}),
+	);
 }
 
 async function readContextIndex(bucket: R2BucketLike | undefined): Promise<ContextIndex> {
@@ -631,25 +698,35 @@ async function readJson<T>(bucket: R2BucketLike | undefined, key: string): Promi
 
 async function writeContextBundles(bucket: R2BucketLike, contexts: ProjectContext[], generatedAt: string) {
 	const runId = generatedAt.replace(/[:.]/g, '-');
-	const index: ContextIndex = { version: 1, lastRunAt: generatedAt, projects: {} };
+	const index: ContextIndex = {
+		version: 1,
+		lastRunAt: generatedAt,
+		projects: {},
+	};
 	for (const context of contexts) {
 		const prefix = `contexts/projects/${context.repo.replace('/', '__')}`;
 		const latestContextKey = `${prefix}/latest.json`;
 		const historyKey = `${prefix}/history/${runId}.json`;
 		if (context.rebuiltThisRun) {
 			await bucket.put(latestContextKey, `${JSON.stringify(context, null, 2)}\n`, { httpMetadata: { contentType: 'application/json' } });
-			await bucket.put(historyKey, `${JSON.stringify(context, null, 2)}\n`, { httpMetadata: { contentType: 'application/json' } });
+			await bucket.put(historyKey, `${JSON.stringify(context, null, 2)}\n`, {
+				httpMetadata: { contentType: 'application/json' },
+			});
 		}
 		index.projects[context.repo] = {
 			stateFingerprint: context.stateFingerprint,
 			inputHash: context.inputHash,
 			latestContextKey,
 			latestAuditKey: `audits/projects/${context.repo.replace('/', '__')}/latest.json`,
-			lastBuiltAt: context.rebuiltThisRun ? generatedAt : context.lastPushed ?? generatedAt,
+			lastBuiltAt: context.rebuiltThisRun ? generatedAt : (context.lastPushed ?? generatedAt),
 		};
 	}
 	await bucket.put('contexts/index.json', `${JSON.stringify(index, null, 2)}\n`, { httpMetadata: { contentType: 'application/json' } });
-	await bucket.put(`contexts/runs/${runId}.json`, `${JSON.stringify({ generatedAt, projects: contexts.map((context) => ({ repo: context.repo, stateFingerprint: context.stateFingerprint, inputHash: context.inputHash, r2Key: `contexts/projects/${context.repo.replace('/', '__')}/latest.json`, rebuiltThisRun: context.rebuiltThisRun })) }, null, 2)}\n`, { httpMetadata: { contentType: 'application/json' } });
+	await bucket.put(
+		`contexts/runs/${runId}.json`,
+		`${JSON.stringify({ generatedAt, projects: contexts.map((context) => ({ repo: context.repo, stateFingerprint: context.stateFingerprint, inputHash: context.inputHash, r2Key: `contexts/projects/${context.repo.replace('/', '__')}/latest.json`, rebuiltThisRun: context.rebuiltThisRun })) }, null, 2)}\n`,
+		{ httpMetadata: { contentType: 'application/json' } },
+	);
 }
 
 async function buildProjectContexts(
@@ -661,24 +738,26 @@ async function buildProjectContexts(
 	lessons: string,
 ): Promise<ProjectContext[]> {
 	const memoryHash = await sha256(stableJson({ lessons, rejected: [...rejected].sort() }));
-	return await Promise.all(repos.map(async (repo) => {
-		const stateFingerprint = await projectStateFingerprint(repo, issues, pullRequests, memoryHash);
-		const base = {
-			repo: repo.fullName,
-			stateFingerprint,
-			rebuiltThisRun: true,
-			url: repo.url,
-			description: repo.description,
-			language: repo.language,
-			lastPushed: repo.pushedAt,
-			health: repo.health,
-			openTodos: repo.openTodos,
-			openIssues: issues.filter((issue) => issue.repo === repo.fullName),
-			openPullRequests: pullRequests.filter((pr) => pr.repo === repo.fullName),
-			deterministicFindings: recommendations.filter((item) => item.repo === repo.fullName && !rejected.has(item.fingerprint)),
-		};
-		return { ...base, inputHash: await sha256(stableJson(base)) };
-	}));
+	return await Promise.all(
+		repos.map(async (repo) => {
+			const stateFingerprint = await projectStateFingerprint(repo, issues, pullRequests, memoryHash);
+			const base = {
+				repo: repo.fullName,
+				stateFingerprint,
+				rebuiltThisRun: true,
+				url: repo.url,
+				description: repo.description,
+				language: repo.language,
+				lastPushed: repo.pushedAt,
+				health: repo.health,
+				openTodos: repo.openTodos,
+				openIssues: issues.filter((issue) => issue.repo === repo.fullName),
+				openPullRequests: pullRequests.filter((pr) => pr.repo === repo.fullName),
+				deterministicFindings: recommendations.filter((item) => item.repo === repo.fullName && !rejected.has(item.fingerprint)),
+			};
+			return { ...base, inputHash: await sha256(stableJson(base)) };
+		}),
+	);
 }
 
 function buildRunContextBundle(options: {
@@ -755,7 +834,10 @@ function buildContextSummary(options: { repos: RepoSummary[]; projectContexts: P
 		reusedContextBundles: options.prepared.reused,
 		projectsWithTodos: options.repos
 			.filter((repo) => repo.openTodos.length > 0)
-			.map((repo) => ({ repo: repo.fullName, todos: repo.openTodos.slice(0, 5) })),
+			.map((repo) => ({
+				repo: repo.fullName,
+				todos: repo.openTodos.slice(0, 5),
+			})),
 		healthGaps: {
 			missingDescription: options.repos.filter((repo) => !repo.description).map((repo) => repo.fullName),
 			missingLicense: options.repos.filter((repo) => !repo.health.hasLicense).map((repo) => repo.fullName),
@@ -773,7 +855,13 @@ function buildContextSummary(options: { repos: RepoSummary[]; projectContexts: P
 }
 
 async function loadExistingProjectAudits(bucket: R2BucketLike | undefined, projectContexts: ProjectContext[], generatedAt: string): Promise<AuditRunSummary> {
-	if (!bucket) return { audited: [], carriedForward: [], skipped: projectContexts.map((project) => project.repo), results: [] };
+	if (!bucket)
+		return {
+			audited: [],
+			carriedForward: [],
+			skipped: projectContexts.map((project) => project.repo),
+			results: [],
+		};
 	const results: ProjectAudit[] = [];
 	const carriedForward: string[] = [];
 	const skipped: string[] = [];
@@ -870,12 +958,17 @@ ${options.lessons}`,
 			audited,
 			carriedForward,
 			skipped,
-			projects: Object.fromEntries(results.map((audit) => [audit.repo, {
-				latestAuditKey: `audits/projects/${audit.repo.replace('/', '__')}/latest.json`,
-				lastInputHash: audit.inputHash,
-				lastAuditedAt: audit.auditedAt,
-				status: audit.status,
-			}])),
+			projects: Object.fromEntries(
+				results.map((audit) => [
+					audit.repo,
+					{
+						latestAuditKey: `audits/projects/${audit.repo.replace('/', '__')}/latest.json`,
+						lastInputHash: audit.inputHash,
+						lastAuditedAt: audit.auditedAt,
+						status: audit.status,
+					},
+				]),
+			),
 		};
 		await options.bucket.put('audits/index.json', `${JSON.stringify(index, null, 2)}\n`, { httpMetadata: { contentType: 'application/json' } });
 	}
@@ -915,12 +1008,24 @@ async function writeReportToR2(bucket: R2BucketLike, report: MaintenanceReport) 
 		`reports/history/${day}/daily-maintenance.md`,
 		`reports/history/${day}/daily-maintenance.json`,
 	];
-	await bucket.put(keys[0], markdown, { httpMetadata: { contentType: 'text/markdown; charset=utf-8' } });
-	await bucket.put(keys[1], json, { httpMetadata: { contentType: 'application/json' } });
-	await bucket.put(keys[2], markdown, { httpMetadata: { contentType: 'text/markdown; charset=utf-8' } });
-	await bucket.put(keys[3], json, { httpMetadata: { contentType: 'application/json' } });
-	await bucket.put(keys[4], markdown, { httpMetadata: { contentType: 'text/markdown; charset=utf-8' } });
-	await bucket.put(keys[5], json, { httpMetadata: { contentType: 'application/json' } });
+	await bucket.put(keys[0], markdown, {
+		httpMetadata: { contentType: 'text/markdown; charset=utf-8' },
+	});
+	await bucket.put(keys[1], json, {
+		httpMetadata: { contentType: 'application/json' },
+	});
+	await bucket.put(keys[2], markdown, {
+		httpMetadata: { contentType: 'text/markdown; charset=utf-8' },
+	});
+	await bucket.put(keys[3], json, {
+		httpMetadata: { contentType: 'application/json' },
+	});
+	await bucket.put(keys[4], markdown, {
+		httpMetadata: { contentType: 'text/markdown; charset=utf-8' },
+	});
+	await bucket.put(keys[5], json, {
+		httpMetadata: { contentType: 'application/json' },
+	});
 	return keys;
 }
 
@@ -930,18 +1035,22 @@ function renderMarkdown(report: MaintenanceReport) {
 	const sortedCandidates = [...report.draftPrCandidates].sort(compareRecommendations);
 	const inbox = buildActionInbox(sortedIssues, sortedPrs, sortedCandidates);
 	const actionInbox = inbox.map((item, index) => `${index + 1}. ${item}`).join('\n\n') || 'No urgent actions today.';
-	const modeNotice = report.mode === 'context-only-no-model'
-		? `\n> **LLM not configured.** This is a degraded surface-audit report. MaintainerBot still built/reused context bundles and emitted deterministic facts, but no LLM synthesized recommendations.\n`
-		: '';
+	const modeNotice =
+		report.mode === 'context-only-no-model'
+			? `\n> **LLM not configured.** This is a degraded surface-audit report. MaintainerBot still built/reused context bundles and emitted deterministic facts, but no LLM synthesized recommendations.\n`
+			: '';
 	const contextMd = renderContextSummary(report.contextSummary);
 	const auditSummary = renderAuditSummary(report.llmAudits, report.mode);
-	const candidates = sortedCandidates
-		.map(
-			(pr, index) =>
-				`### ${index + 1}. [${pr.repo}](https://github.com/${pr.repo}): ${pr.title}\n\n- Fingerprint: \`${pr.fingerprint}\`\n- Risk: ${pr.risk}\n- Why it matters: ${pr.reason}\n- Suggested action: ${candidateAction(pr)}\n- Verification: ${pr.verification}\n`,
-		)
-		.join('\n') || 'No manual action candidates.';
-	const created = report.createdDraftPrs.map((pr) => `- ${pr.status}: ${pr.repo}${pr.url ? ` — ${pr.url}` : ''}${pr.reason ? ` — ${pr.reason}` : ''}`).join('\n') || '- Read-only mode: no GitHub mutations created.';
+	const candidates =
+		sortedCandidates
+			.map(
+				(pr, index) =>
+					`### ${index + 1}. [${pr.repo}](https://github.com/${pr.repo}): ${pr.title}\n\n- Fingerprint: \`${pr.fingerprint}\`\n- Risk: ${pr.risk}\n- Why it matters: ${pr.reason}\n- Suggested action: ${candidateAction(pr)}\n- Verification: ${pr.verification}\n`,
+			)
+			.join('\n') || 'No manual action candidates.';
+	const created =
+		report.createdDraftPrs.map((pr) => `- ${pr.status}: ${pr.repo}${pr.url ? ` — ${pr.url}` : ''}${pr.reason ? ` — ${pr.reason}` : ''}`).join('\n') ||
+		'- Read-only mode: no GitHub mutations created.';
 	const prMd = sortedPrs.map((item) => workItemLine(item, 'PR')).join('\n') || '- No open PRs found.';
 	const issueMd = sortedIssues.map((item) => workItemLine(item, 'issue')).join('\n') || '- No open issues found.';
 	const bestPractices = report.bestPractices.map((item) => `- ${linkRepoInText(item)}`).join('\n') || '- No best-practice findings.';
@@ -955,14 +1064,28 @@ function renderContextSummary(summary: ContextSummary) {
 	const todos = summary.projectsWithTodos.length
 		? summary.projectsWithTodos.map((project) => `- [${project.repo}](https://github.com/${project.repo}): ${project.todos.slice(0, 3).join('; ')}`).join('\n')
 		: '- No root TODO items found in loaded context.';
-	const refs = summary.projectContextRefs.slice(0, 12).map((ref) => `- [${ref.repo}](https://github.com/${ref.repo}) — ${ref.rebuiltThisRun ? 'rebuilt' : 'reused'} context, input \`${ref.inputHash.slice(0, 12)}\``).join('\n') || '- No project context refs.';
+	const refs =
+		summary.projectContextRefs
+			.slice(0, 12)
+			.map((ref) => `- [${ref.repo}](https://github.com/${ref.repo}) — ${ref.rebuiltThisRun ? 'rebuilt' : 'reused'} context, input \`${ref.inputHash.slice(0, 12)}\``)
+			.join('\n') || '- No project context refs.';
 	return `- LLM configured: ${summary.llmConfigured ? 'yes' : 'no'}\n- Context bundles rebuilt: ${summary.rebuiltContextBundles.length}\n- Context bundles reused: ${summary.reusedContextBundles.length}\n- Projects with root TODOs: ${summary.projectsWithTodos.length}\n- Missing descriptions: ${summary.healthGaps.missingDescription.length}\n- Missing licenses: ${summary.healthGaps.missingLicense.length}\n- Package repos missing CI: ${summary.healthGaps.missingCi.length}\n- Package repos missing tests/check scripts: ${summary.healthGaps.missingTests.length}\n\n### TODO-backed context\n\n${todos}\n\n### Project context refs\n\n${refs}`;
 }
 
 function renderAuditSummary(audits: AuditRunSummary, mode: MaintenanceReport['mode']) {
-	const audited = audits.audited.length ? audits.audited.map((repo) => `- Audited: [${repo}](https://github.com/${repo})`).join('\n') : mode === 'llm-assisted' ? '- No projects needed a fresh LLM audit.' : '- No fresh LLM audits ran because no model is configured.';
-	const carried = audits.carriedForward.length ? audits.carriedForward.map((repo) => `- Carried forward: [${repo}](https://github.com/${repo})`).join('\n') : '- No carried-forward audits.';
-	const skipped = audits.skipped.length ? mode === 'llm-assisted' ? `- Skipped ${audits.skipped.length} project(s) because R2 audit persistence was unavailable.` : `- No previous LLM audit found for ${audits.skipped.length} project(s). Configure a model key to generate audits.` : '- No projects skipped.';
+	const audited = audits.audited.length
+		? audits.audited.map((repo) => `- Audited: [${repo}](https://github.com/${repo})`).join('\n')
+		: mode === 'llm-assisted'
+			? '- No projects needed a fresh LLM audit.'
+			: '- No fresh LLM audits ran because no model is configured.';
+	const carried = audits.carriedForward.length
+		? audits.carriedForward.map((repo) => `- Carried forward: [${repo}](https://github.com/${repo})`).join('\n')
+		: '- No carried-forward audits.';
+	const skipped = audits.skipped.length
+		? mode === 'llm-assisted'
+			? `- Skipped ${audits.skipped.length} project(s) because R2 audit persistence was unavailable.`
+			: `- No previous LLM audit found for ${audits.skipped.length} project(s). Configure a model key to generate audits.`
+		: '- No projects skipped.';
 	return `${audited}\n${carried}\n${skipped}`;
 }
 
@@ -975,7 +1098,9 @@ function buildActionInbox(issues: WorkItem[], prs: WorkItem[], candidates: Recom
 		items.push(`${priority(pr)} Review PR [${pr.repo}#${pr.number}](${pr.url})\n   - Why: ${prReason(pr)}\n   - Suggested action: review, merge, request changes, or close`);
 	}
 	for (const candidate of candidates.slice(0, 5)) {
-		items.push(`[P3] Candidate fix [${candidate.repo}](https://github.com/${candidate.repo}) — ${candidate.title}\n   - Why: ${candidate.reason}\n   - Suggested action: ${candidateAction(candidate)}`);
+		items.push(
+			`[P3] Candidate fix [${candidate.repo}](https://github.com/${candidate.repo}) — ${candidate.title}\n   - Why: ${candidate.reason}\n   - Suggested action: ${candidateAction(candidate)}`,
+		);
 	}
 	return items.slice(0, 12);
 }
@@ -1033,11 +1158,56 @@ function buildDeterministicReport(repos: RepoSummary[], issues: WorkItem[], pull
 	const dependencyUnknown = repos.filter((repo) => repo.health.hasPackageJson && !repo.health.hasLockfile).slice(0, 10);
 	const stale = repos.filter((repo) => repo.pushedAt && Date.now() - Date.parse(repo.pushedAt) > 180 * 24 * 60 * 60 * 1000).slice(0, 10);
 	const recommendations = [
-		...needsDescription.map((repo) => recommendation(repo.fullName, 'metadata-description', 'Add or improve project description/documentation', 'Repository metadata appears incomplete from the scan.', 'Confirm README accurately states purpose and update GitHub description or docs.', 'low' as const)),
-		...missingReadme.map((repo) => recommendation(repo.fullName, 'missing-readme', 'Add README documentation', 'Repository does not expose a README at the root.', 'Add README with purpose, setup, run/test commands, and maintenance notes.', 'low' as const)),
-		...missingCi.map((repo) => recommendation(repo.fullName, 'missing-ci', 'Add basic CI checks', 'Package repository appears to lack GitHub Actions workflows.', 'Add a small CI workflow that installs dependencies and runs tests/build where available.', 'medium' as const)),
-		...missingTests.map((repo) => recommendation(repo.fullName, 'missing-test-script', 'Add or document test command', 'Package repository does not advertise a test/check script.', 'Add a test/check script or document why no automated test exists.', 'medium' as const)),
-		...stale.map((repo) => recommendation(repo.fullName, 'stale-repo-review', 'Review stale repository status', 'Repository has not been pushed recently.', 'Confirm whether the repo should be archived, refreshed, or documented as complete.', 'low' as const)),
+		...needsDescription.map((repo) =>
+			recommendation(
+				repo.fullName,
+				'metadata-description',
+				'Add or improve project description/documentation',
+				'Repository metadata appears incomplete from the scan.',
+				'Confirm README accurately states purpose and update GitHub description or docs.',
+				'low' as const,
+			),
+		),
+		...missingReadme.map((repo) =>
+			recommendation(
+				repo.fullName,
+				'missing-readme',
+				'Add README documentation',
+				'Repository does not expose a README at the root.',
+				'Add README with purpose, setup, run/test commands, and maintenance notes.',
+				'low' as const,
+			),
+		),
+		...missingCi.map((repo) =>
+			recommendation(
+				repo.fullName,
+				'missing-ci',
+				'Add basic CI checks',
+				'Package repository appears to lack GitHub Actions workflows.',
+				'Add a small CI workflow that installs dependencies and runs tests/build where available.',
+				'medium' as const,
+			),
+		),
+		...missingTests.map((repo) =>
+			recommendation(
+				repo.fullName,
+				'missing-test-script',
+				'Add or document test command',
+				'Package repository does not advertise a test/check script.',
+				'Add a test/check script or document why no automated test exists.',
+				'medium' as const,
+			),
+		),
+		...stale.map((repo) =>
+			recommendation(
+				repo.fullName,
+				'stale-repo-review',
+				'Review stale repository status',
+				'Repository has not been pushed recently.',
+				'Confirm whether the repo should be archived, refreshed, or documented as complete.',
+				'low' as const,
+			),
+		),
 	].filter((item) => !rejected.has(item.fingerprint));
 	return {
 		summary: `Scanned ${repos.length} public, non-fork, non-archived repositories updated since November 17, 2025. Found ${issues.length} open issues, ${pullRequests.length} open PRs, ${needsDescription.length} repos missing descriptions, ${missingReadme.length} missing READMEs, ${missingCi.length} package repos missing CI, and ${missingTests.length} package repos missing test/check scripts.`,
@@ -1072,7 +1242,14 @@ function buildDeterministicReport(repos: RepoSummary[], issues: WorkItem[], pull
 }
 
 function recommendation(repo: string, kind: string, title: string, reason: string, verification: string, risk: 'low' | 'medium' | 'high'): Recommendation {
-	return { fingerprint: `${repo}:${kind}:${slug(title)}`, repo, title, reason, verification, risk };
+	return {
+		fingerprint: `${repo}:${kind}:${slug(title)}`,
+		repo,
+		title,
+		reason,
+		verification,
+		risk,
+	};
 }
 
 function priorityForRecommendation(item: Recommendation): 'P0' | 'P1' | 'P2' | 'P3' {
@@ -1098,10 +1275,20 @@ function priority(item: WorkItem) {
 }
 
 function slug(value: string) {
-	return value.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 80);
+	return value
+		.toLowerCase()
+		.replace(/[^a-z0-9]+/g, '-')
+		.replace(/^-|-$/g, '')
+		.slice(0, 80);
 }
 
-async function maybeCreateDraftPrs(_report: MaintenanceReport, _repos: RepoSummary[], _env: Record<string, any>, _headers: Record<string, string>, _bucket?: R2BucketLike): Promise<CreatedDraftPr[]> {
+async function maybeCreateDraftPrs(
+	_report: MaintenanceReport,
+	_repos: RepoSummary[],
+	_env: Record<string, any>,
+	_headers: Record<string, string>,
+	_bucket?: R2BucketLike,
+): Promise<CreatedDraftPr[]> {
 	// MaintainerBot is intentionally read-only. It may recommend actions, but it must not
 	// create branches, commits, pull requests, comments, labels, or other GitHub mutations.
 	return [];
@@ -1136,7 +1323,11 @@ async function ghOptional(url: string, headers: Record<string, string>): Promise
 }
 
 async function gh(url: string, headers: Record<string, string>, method = 'GET', body?: unknown): Promise<any> {
-	const response = await fetch(url, { method, headers: { ...headers, 'Content-Type': 'application/json' }, body: body ? JSON.stringify(body) : undefined });
+	const response = await fetch(url, {
+		method,
+		headers: { ...headers, 'Content-Type': 'application/json' },
+		body: body ? JSON.stringify(body) : undefined,
+	});
 	const text = await response.text();
 	if (!response.ok) throw new Error(`${response.status} ${response.statusText}: ${text}`);
 	return text ? JSON.parse(text) : null;

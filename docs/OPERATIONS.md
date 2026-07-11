@@ -144,7 +144,7 @@ If a GitHub token is used, prefer the least-privileged read-only token available
 Run the CLI-only read-only verifier locally or from GitHub Actions when a checkout/test pass is useful:
 
 ```bash
-pnpm run deep:verify -- --payload '{"repo":"adewale/project"}'
+pnpm run deep:verify -- --input '{"repo":"adewale/project"}'
 ```
 
 The verifier refuses repositories not changed since November 17, 2025 and does not push anything.

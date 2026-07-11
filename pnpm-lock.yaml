@@ -5,15 +5,15 @@ settings:
   excludeLinksFromLockfile: false
 
 overrides:
-  '@flue/runtime': 1.0.0-beta.2
+  '@flue/runtime': 1.0.0-beta.9
 
 importers:
 
   .:
     dependencies:
       '@flue/runtime':
-        specifier: 1.0.0-beta.2
-        version: 1.0.0-beta.2(@cfworker/json-schema@4.1.1)(@standard-schema/spec@1.1.0)(@types/json-schema@7.0.15)(typebox@1.1.38)(typescript@6.0.3)(ws@8.21.0)(zod-to-json-schema@3.25.2(zod@4.4.3))(zod@4.4.3)
+        specifier: 1.0.0-beta.9
+        version: 1.0.0-beta.9(@cfworker/json-schema@4.1.1)(@standard-schema/spec@1.1.0)(@types/json-schema@7.0.15)(typebox@1.1.38)(typescript@6.0.3)(ws@8.21.0)(zod-to-json-schema@3.25.2(zod@4.4.3))(zod@4.4.3)
       agents:
         specifier: ^0.14.5
         version: 0.14.5(@babel/core@7.29.0)(@babel/runtime@7.29.7)(@cloudflare/workers-types@4.20260620.1)(ai@6.0.175(zod@4.4.3))(react@19.2.6)(rolldown@1.0.3)(vite@8.0.16(@types/node@22.20.0)(esbuild@0.28.1)(yaml@2.9.0))(zod@4.4.3)
@@ -28,8 +28,8 @@ importers:
         specifier: ^4.20260620.1
         version: 4.20260620.1
       '@flue/cli':
-        specifier: 1.0.0-beta.1
-        version: 1.0.0-beta.1(@cfworker/json-schema@4.1.1)(@standard-schema/spec@1.1.0)(@types/json-schema@7.0.15)(@types/node@22.20.0)(esbuild@0.28.1)(typebox@1.1.38)(typescript@6.0.3)(workerd@1.20260617.1)(wrangler@4.103.0(@cloudflare/workers-types@4.20260620.1))(ws@8.21.0)(yaml@2.9.0)(zod-to-json-schema@3.25.2(zod@4.4.3))(zod@4.4.3)
+        specifier: 1.0.0-beta.9
+        version: 1.0.0-beta.9(@cfworker/json-schema@4.1.1)(@standard-schema/spec@1.1.0)(@types/json-schema@7.0.15)(@types/node@22.20.0)(esbuild@0.28.1)(hono@4.12.25)(typebox@1.1.38)(typescript@6.0.3)(workerd@1.20260617.1)(wrangler@4.103.0(@cloudflare/workers-types@4.20260620.1))(ws@8.21.0)(yaml@2.9.0)(zod-to-json-schema@3.25.2(zod@4.4.3))(zod@4.4.3)
       '@types/node':
         specifier: ^22.20.0
         version: 22.20.0
@@ -402,12 +402,12 @@ packages:
     engines: {node: '>=18.0.0'}
     hasBin: true
 
-  '@earendil-works/pi-agent-core@0.79.6':
-    resolution: {integrity: sha512-SXZc4rQI+3zgUmAJDbU0GzFEHCPHbhItjN7QLsahj3TKfQAon4guwCqsrwZBLH5lPcub2+evTojPNrPItL62tA==}
+  '@earendil-works/pi-agent-core@0.80.6':
+    resolution: {integrity: sha512-Lvn89ko42h5ETUb6Z0Ku6ldskEqXaTdQBYvSa0+7bdG9V6rUEpXptv5e0OVZ1HDcvi8s6/2lGCQWsxKX+DFHNw==}
     engines: {node: '>=22.19.0'}
 
-  '@earendil-works/pi-ai@0.79.6':
-    resolution: {integrity: sha512-KGepEdgEeWDs7Imwlp96tBsO8TjSIpcDBvazsCDtHRa81+uwJI/YGetTegI52pMlKhVpJFLIGajRi4PCGC5MUg==}
+  '@earendil-works/pi-ai@0.80.6':
+    resolution: {integrity: sha512-7xfLk8sANBp+bpPEbjoOZTbPxsa+++b1JXAoSJsNa3vbs9AHHEclmvg54XLQcxH+fuwaeti/g2jeIfJ+mVYLpA==}
     engines: {node: '>=22.19.0'}
     hasBin: true
 
@@ -576,17 +576,17 @@ packages:
     cpu: [x64]
     os: [win32]
 
-  '@flue/cli@1.0.0-beta.1':
-    resolution: {integrity: sha512-XbSsn7Nl2/J80Y+7Ph7tLF0Y3+doVdBXD8rPikuaMeq4mhHYSn5DjOwgXS2+TdzKcpOKyNVwttORyoVAjWdbtA==}
+  '@flue/cli@1.0.0-beta.9':
+    resolution: {integrity: sha512-RPv28ecD7lQ2XBZbuohte3rXDqHHrdXTpCGC5mSxYQsEkOeDN2LOmImQZbJqCrkIAFmMgntzOhaF2+14R61C4Q==}
     engines: {node: '>=22.19.0'}
     hasBin: true
 
-  '@flue/runtime@1.0.0-beta.2':
-    resolution: {integrity: sha512-AHPaXiE2K0ABVe60XCCjUAH12tO6zMYZ+CJGbcFdPW5cYOGyzc91laBIA6fKHGgRENw4wh7w/6Jz3ZRDCvuKVw==}
+  '@flue/runtime@1.0.0-beta.9':
+    resolution: {integrity: sha512-ksh0ZkTVyqQnGvU3OnbVX6luAJwe6tt8q7O0vn99b7Cx6XcPTXzY/YEkXrOtCHzV6ZwfSdO9ZfaWbhTD1tdQuQ==}
     engines: {node: '>=22.19.0'}
 
-  '@flue/sdk@1.0.0-beta.1':
-    resolution: {integrity: sha512-61VS3lcPey8ZHLGC6lk94yzuNxSHqaROqmgrswnoH2E/1ILR+ZYoLmKYTbQuOi0lulBl/ykh1WlvTQztFg2/nA==}
+  '@flue/sdk@1.0.0-beta.9':
+    resolution: {integrity: sha512-EkGWF1Yw6baM4ekmp+3xFkc+LmDKcIAA0KQSZSpaSqQRYyixXB+IwEbhePS83HCgrR0/jup9l8rgld4Q2IGNOw==}
 
   '@google/genai@1.52.0':
     resolution: {integrity: sha512-gwSvbpiN/17O9TbsqSsE/OzZcpv5Fo4RQjdngGgogtuB9RsyJ8ZHhX5KjHj1bp5N9snN2eK8LDGXSaWW2hof8Q==}
@@ -789,8 +789,13 @@ packages:
   '@microsoft/fetch-event-source@2.0.1':
     resolution: {integrity: sha512-W6CLUJ2eBMw3Rec70qrsEW0jOm/3twwJv21mrmj2yORiaVmVYGS4sSS5yUwvQc1ZlDLYGPnClVWmUUMagKNsfA==}
 
-  '@mistralai/mistralai@2.2.1':
-    resolution: {integrity: sha512-uKU8CZmL2RzYKmplsU01hii4p3pe4HqJefpWNRWXm1Tcm0Sm4xXfwSLIy4k7ZCPlbETCGcp69E7hZs+WOJ5itQ==}
+  '@mistralai/mistralai@2.2.6':
+    resolution: {integrity: sha512-W8pX7zHxjJvMIpw8JMxeJEleapXX0Q9NPszdNzqkM3MIEoIGPObdodujj+WHteXEvGfaP/AMwlNyRfEzSY6dQQ==}
+    peerDependencies:
+      '@opentelemetry/api': ^1.9.0
+    peerDependenciesMeta:
+      '@opentelemetry/api':
+        optional: true
 
   '@mixmark-io/domino@2.2.0':
     resolution: {integrity: sha512-Y28PR25bHXUg88kCV7nivXrP2Nj2RueZ3/l/jdx6J9f8J4nsEGcgX0Qe6lt7Pa+J79+kPiJU3LguR6O/6zrLOw==}
@@ -821,6 +826,10 @@ packages:
   '@opentelemetry/api@1.9.0':
     resolution: {integrity: sha512-3giAOQvZiH5F9bMlMiv8+GSPMeqg0dbaeo58/0SlA9sxSqZhnUtxzX9/2FzyhS9sWQf5S0GJE0AKBrFqjpeYcg==}
     engines: {node: '>=8.0.0'}
+
+  '@opentelemetry/semantic-conventions@1.43.0':
+    resolution: {integrity: sha512-eSYWTm620tTk45EKSedaUL8MFYI8hW164hIXsgIHyxu3VobUB3fFCu5t0hQby6OoWRPsG1KkKUG2M5UadiLiVg==}
+    engines: {node: '>=14'}
 
   '@oxc-project/types@0.133.0':
     resolution: {integrity: sha512-KzkdCd6Uxqnf6l3HOw1xfatAlUURA0g14cvBYFyJ5SaNOQbOUvBr9PKArcPcrNIeRsBdgcUzOGrhKveVpvOIGA==}
@@ -1096,9 +1105,6 @@ packages:
 
   '@types/node@22.20.0':
     resolution: {integrity: sha512-QWlFW2wf3nTjC13/DqRnBpR4ZO36VJH/JVBkA/vcnmbTBNQIlnObqyqZE1tUR7+Ni23Lda8R1BxMfbXRpCUx5g==}
-
-  '@types/node@26.0.0':
-    resolution: {integrity: sha512-vf2YFi1iY9lHGwNJMs01biZFbKJkrZR1T6/MlzjhJLPdntOHLhTrDSnSVcdtvjihi4VQNlrFRIxLsDBlQpAipA==}
 
   '@types/retry@0.12.0':
     resolution: {integrity: sha512-wWKOClTTiizcZhXnPY4wikVAwmdYHp8q6DmC+EJUzAMsycb7HB32Kh9RN4+0gExjmPmZSAQjgURXIGATPegAvA==}
@@ -2172,9 +2178,6 @@ packages:
   undici-types@6.21.0:
     resolution: {integrity: sha512-iwDZqg0QAGrg9Rav5H4n0M64c3mkR59cJ6wQp+7C4nI0gsmExaedaYLNO44eT4AtBBwjbTiGPMlt2Md0T9H9JQ==}
 
-  undici-types@8.3.0:
-    resolution: {integrity: sha512-j375ScV60dom+YkPFIfTLcOiPxkN/buHz5GobjLhixFuANaNs3C9l4GmrWqejgXWJ7BbJcFYpTEUkS1Ge8bpZQ==}
-
   undici@7.24.8:
     resolution: {integrity: sha512-6KQ/+QxK49Z/p3HO6E5ZCZWNnCasyZLa5ExaVYyvPxUwKtbCPMKELJOqh7EqOle0t9cH/7d2TaaTRRa6Nhs4YQ==}
     engines: {node: '>=20.18.1'}
@@ -2842,9 +2845,9 @@ snapshots:
       '@microsoft/fetch-event-source': 2.0.1
       fastq: 1.20.1
 
-  '@earendil-works/pi-agent-core@0.79.6(@modelcontextprotocol/sdk@1.29.0(@cfworker/json-schema@4.1.1)(zod@4.4.3))(ws@8.21.0)(zod@4.4.3)':
+  '@earendil-works/pi-agent-core@0.80.6(@modelcontextprotocol/sdk@1.29.0(@cfworker/json-schema@4.1.1)(zod@4.4.3))(ws@8.21.0)(zod@4.4.3)':
     dependencies:
-      '@earendil-works/pi-ai': 0.79.6(@modelcontextprotocol/sdk@1.29.0(@cfworker/json-schema@4.1.1)(zod@4.4.3))(ws@8.21.0)(zod@4.4.3)
+      '@earendil-works/pi-ai': 0.80.6(@modelcontextprotocol/sdk@1.29.0(@cfworker/json-schema@4.1.1)(zod@4.4.3))(ws@8.21.0)(zod@4.4.3)
       ignore: 7.0.5
       typebox: 1.1.38
       yaml: 2.9.0
@@ -2856,12 +2859,13 @@ snapshots:
       - ws
       - zod
 
-  '@earendil-works/pi-ai@0.79.6(@modelcontextprotocol/sdk@1.29.0(@cfworker/json-schema@4.1.1)(zod@4.4.3))(ws@8.21.0)(zod@4.4.3)':
+  '@earendil-works/pi-ai@0.80.6(@modelcontextprotocol/sdk@1.29.0(@cfworker/json-schema@4.1.1)(zod@4.4.3))(ws@8.21.0)(zod@4.4.3)':
     dependencies:
       '@anthropic-ai/sdk': 0.91.1(zod@4.4.3)
       '@aws-sdk/client-bedrock-runtime': 3.1048.0
       '@google/genai': 1.52.0(@modelcontextprotocol/sdk@1.29.0(@cfworker/json-schema@4.1.1)(zod@4.4.3))
-      '@mistralai/mistralai': 2.2.1
+      '@mistralai/mistralai': 2.2.6(@opentelemetry/api@1.9.0)
+      '@opentelemetry/api': 1.9.0
       '@smithy/node-http-handler': 4.7.3
       http-proxy-agent: 7.0.2
       https-proxy-agent: 7.0.6
@@ -2970,14 +2974,18 @@ snapshots:
   '@esbuild/win32-x64@0.28.1':
     optional: true
 
-  '@flue/cli@1.0.0-beta.1(@cfworker/json-schema@4.1.1)(@standard-schema/spec@1.1.0)(@types/json-schema@7.0.15)(@types/node@22.20.0)(esbuild@0.28.1)(typebox@1.1.38)(typescript@6.0.3)(workerd@1.20260617.1)(wrangler@4.103.0(@cloudflare/workers-types@4.20260620.1))(ws@8.21.0)(yaml@2.9.0)(zod-to-json-schema@3.25.2(zod@4.4.3))(zod@4.4.3)':
+  '@flue/cli@1.0.0-beta.9(@cfworker/json-schema@4.1.1)(@standard-schema/spec@1.1.0)(@types/json-schema@7.0.15)(@types/node@22.20.0)(esbuild@0.28.1)(hono@4.12.25)(typebox@1.1.38)(typescript@6.0.3)(workerd@1.20260617.1)(wrangler@4.103.0(@cloudflare/workers-types@4.20260620.1))(ws@8.21.0)(yaml@2.9.0)(zod-to-json-schema@3.25.2(zod@4.4.3))(zod@4.4.3)':
     dependencies:
       '@cloudflare/vite-plugin': 1.41.0(vite@8.0.16(@types/node@22.20.0)(esbuild@0.28.1)(yaml@2.9.0))(workerd@1.20260617.1)(wrangler@4.103.0(@cloudflare/workers-types@4.20260620.1))
-      '@flue/runtime': 1.0.0-beta.2(@cfworker/json-schema@4.1.1)(@standard-schema/spec@1.1.0)(@types/json-schema@7.0.15)(typebox@1.1.38)(typescript@6.0.3)(ws@8.21.0)(zod-to-json-schema@3.25.2(zod@4.4.3))(zod@4.4.3)
-      '@flue/sdk': 1.0.0-beta.1
+      '@flue/runtime': 1.0.0-beta.9(@cfworker/json-schema@4.1.1)(@standard-schema/spec@1.1.0)(@types/json-schema@7.0.15)(typebox@1.1.38)(typescript@6.0.3)(ws@8.21.0)(zod-to-json-schema@3.25.2(zod@4.4.3))(zod@4.4.3)
+      '@flue/sdk': 1.0.0-beta.9
+      '@hono/node-server': 2.0.5(hono@4.12.25)
       '@vercel/detect-agent': 1.2.3
+      debug: 4.4.3
       minisearch: 7.2.0
       package-up: 5.0.0
+      picocolors: 1.1.1
+      ulidx: 2.4.1
       valibot: 1.4.1(typescript@6.0.3)
       vite: 8.0.16(@types/node@22.20.0)(esbuild@0.28.1)(yaml@2.9.0)
     transitivePeerDependencies:
@@ -2990,6 +2998,7 @@ snapshots:
       - bufferutil
       - effect
       - esbuild
+      - hono
       - jiti
       - less
       - sass
@@ -3011,10 +3020,10 @@ snapshots:
       - zod-openapi
       - zod-to-json-schema
 
-  '@flue/runtime@1.0.0-beta.2(@cfworker/json-schema@4.1.1)(@standard-schema/spec@1.1.0)(@types/json-schema@7.0.15)(typebox@1.1.38)(typescript@6.0.3)(ws@8.21.0)(zod-to-json-schema@3.25.2(zod@4.4.3))(zod@4.4.3)':
+  '@flue/runtime@1.0.0-beta.9(@cfworker/json-schema@4.1.1)(@standard-schema/spec@1.1.0)(@types/json-schema@7.0.15)(typebox@1.1.38)(typescript@6.0.3)(ws@8.21.0)(zod-to-json-schema@3.25.2(zod@4.4.3))(zod@4.4.3)':
     dependencies:
-      '@earendil-works/pi-agent-core': 0.79.6(@modelcontextprotocol/sdk@1.29.0(@cfworker/json-schema@4.1.1)(zod@4.4.3))(ws@8.21.0)(zod@4.4.3)
-      '@earendil-works/pi-ai': 0.79.6(@modelcontextprotocol/sdk@1.29.0(@cfworker/json-schema@4.1.1)(zod@4.4.3))(ws@8.21.0)(zod@4.4.3)
+      '@earendil-works/pi-agent-core': 0.80.6(@modelcontextprotocol/sdk@1.29.0(@cfworker/json-schema@4.1.1)(zod@4.4.3))(ws@8.21.0)(zod@4.4.3)
+      '@earendil-works/pi-ai': 0.80.6(@modelcontextprotocol/sdk@1.29.0(@cfworker/json-schema@4.1.1)(zod@4.4.3))(ws@8.21.0)(zod@4.4.3)
       '@hono/node-server': 2.0.5(hono@4.12.25)
       '@hono/standard-validator': 0.2.2(@standard-schema/spec@1.1.0)(hono@4.12.25)
       '@modelcontextprotocol/sdk': 1.29.0(@cfworker/json-schema@4.1.1)(zod@4.4.3)
@@ -3046,7 +3055,7 @@ snapshots:
       - zod-openapi
       - zod-to-json-schema
 
-  '@flue/sdk@1.0.0-beta.1':
+  '@flue/sdk@1.0.0-beta.9':
     dependencies:
       '@durable-streams/client': 0.2.6
 
@@ -3216,11 +3225,14 @@ snapshots:
 
   '@microsoft/fetch-event-source@2.0.1': {}
 
-  '@mistralai/mistralai@2.2.1':
+  '@mistralai/mistralai@2.2.6(@opentelemetry/api@1.9.0)':
     dependencies:
+      '@opentelemetry/semantic-conventions': 1.43.0
       ws: 8.21.0
       zod: 4.4.3
       zod-to-json-schema: 3.25.2(zod@4.4.3)
+    optionalDependencies:
+      '@opentelemetry/api': 1.9.0
     transitivePeerDependencies:
       - bufferutil
       - utf-8-validate
@@ -3267,6 +3279,8 @@ snapshots:
   '@nodable/entities@2.2.0': {}
 
   '@opentelemetry/api@1.9.0': {}
+
+  '@opentelemetry/semantic-conventions@1.43.0': {}
 
   '@oxc-project/types@0.133.0': {}
 
@@ -3463,10 +3477,6 @@ snapshots:
   '@types/node@22.20.0':
     dependencies:
       undici-types: 6.21.0
-
-  '@types/node@26.0.0':
-    dependencies:
-      undici-types: 8.3.0
 
   '@types/retry@0.12.0': {}
 
@@ -4306,7 +4316,7 @@ snapshots:
       '@protobufjs/path': 1.1.2
       '@protobufjs/pool': 1.1.0
       '@protobufjs/utf8': 1.1.1
-      '@types/node': 26.0.0
+      '@types/node': 22.20.0
       long: 5.3.2
 
   proxy-addr@2.0.7:
@@ -4615,8 +4625,6 @@ snapshots:
       layerr: 3.0.0
 
   undici-types@6.21.0: {}
-
-  undici-types@8.3.0: {}
 
   undici@7.24.8: {}
 

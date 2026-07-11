@@ -6,7 +6,7 @@ const root = process.cwd();
 const reportsDir = join(root, 'reports');
 mkdirSync(reportsDir, { recursive: true });
 
-const args = ['exec', 'flue', 'run', 'daily-maintenance', '--target', 'node', '--payload', '{}'];
+const args = ['exec', 'flue', 'run', 'daily-maintenance', '--target', 'node', '--input', '{}'];
 if (existsSync(join(root, '.env'))) args.push('--env', '.env');
 
 const result = spawnSync('pnpm', args, { cwd: root, env: process.env, encoding: 'utf8' });

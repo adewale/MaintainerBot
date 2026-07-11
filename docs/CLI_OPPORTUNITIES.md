@@ -7,7 +7,7 @@ MaintainerBot's scheduled Worker should stay lightweight and read-only. CLI-only
 `deep-verify` is a CLI-only, read-only Flue workflow:
 
 ```bash
-pnpm run deep:verify -- --payload '{"repo":"adewale/project"}'
+pnpm run deep:verify -- --input '{"repo":"adewale/project"}'
 ```
 
 It:
