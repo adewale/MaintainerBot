@@ -19,10 +19,10 @@ jobs:
         with:
           node-version: 22
           cache: pnpm
-      - run: pnpm install
+      - run: pnpm install --frozen-lockfile
       - run: pnpm run check:secrets
       - run: pnpm run check
-      - run: pnpm run test:rejections
+      - run: pnpm test
       - run: pnpm run build:cloudflare
       - uses: gitleaks/gitleaks-action@v2
         env:

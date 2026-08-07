@@ -6,7 +6,8 @@
     "strict": true,
     "skipLibCheck": true,
     "noEmit": true,
-    "types": ["node"]
+    "allowImportingTsExtensions": true,
+    "types": ["node", "@cloudflare/workers-types"]
   },
-  "include": [".flue/**/*.ts", "scripts/**/*.mjs"]
+  "include": ["src/**/*.ts", "scripts/**/*.{ts,mjs}", "tests/**/*.ts", "vite.config.ts", "flue.config.ts"]
 }

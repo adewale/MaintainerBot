@@ -14,7 +14,9 @@ Never commit real tokens.
 
 ## Protected webhook
 
-The Cloudflare workflow webhook requires `MAINTAINERBOT_WEBHOOK_SECRET` when configured. The secret is sent in the JSON payload and checked by the `daily-maintenance` workflow before work begins.
+The Hono webhook requires `MAINTAINERBOT_WEBHOOK_SECRET` and fails closed with `503` when the deployment is missing it. The secret is sent in the JSON payload, validated before the application-owned Cloudflare Workflow starts, and never forwarded in Workflow parameters or Flue agent messages. The run-status route requires the same secret as a bearer token.
+
+`ReportAnalyst` is dispatch-only: it is registered for trusted application calls but has no public agent route. GitHub/R2 secrets and bindings stay in trusted pipeline code.
 
 If the secret leaks:
 
@@ -31,7 +33,7 @@ Run before pushing:
 ```bash
 pnpm run check:secrets
 pnpm run check
-pnpm run test:rejections
+pnpm test
 pnpm run build:cloudflare
 ```
 

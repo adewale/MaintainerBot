@@ -4,10 +4,10 @@
 
 ```mermaid
 flowchart LR
-  ghActions["GitHub Actions schedule<br/>or manual curl"] --> route["Cloudflare Worker<br/>/workflows/daily-maintenance?wait=result"]
+  ghActions["GitHub Actions schedule<br/>or manual curl"] --> route["Hono route<br/>/workflows/daily-maintenance?wait=result"]
   route --> secret{"Webhook secret valid?"}
   secret -- "no" --> unauthorized["401 / Unauthorized"]
-  secret -- "yes" --> workflow["Flue workflow<br/>daily-maintenance"]
+  secret -- "yes" --> workflow["Cloudflare Workflow<br/>MaintainerDailyWorkflow"]
 
   workflow --> r2Read["Read R2 memory<br/>rejections + lessons + context index"]
   workflow --> ghApi["GitHub REST API<br/>repos + issues + PRs + root files"]
@@ -20,13 +20,13 @@ flowchart LR
   context --> changed{"Context changed?"}
   changed -- "no" --> reuse["Reuse previous context/audit"]
   changed -- "yes" --> writeContext["Write context bundle to R2"]
-  changed -- "yes + model configured" --> projectAudit["LLM project audit"]
+  changed -- "yes + model configured" --> projectAudit["Private Flue ReportAnalyst<br/>project audit"]
   reuse --> runBundle["Run context bundle"]
   writeContext --> runBundle
   projectAudit --> runBundle
 
   runBundle --> modelGate{"LLM configured?"}
-  modelGate -- "yes" --> synthesis["LLM final synthesis"]
+  modelGate -- "yes" --> synthesis["Private Flue ReportAnalyst<br/>final synthesis"]
   modelGate -- "no" --> contextOnly["Context-only report"]
   synthesis --> report["MaintenanceReport JSON + Markdown"]
   contextOnly --> report
@@ -38,20 +38,23 @@ flowchart LR
   r2Write --> publicR2["Public raw Markdown"]
 
   subgraph "CLI-only evidence path"
-    cli["flue run deep-verify"] --> local["Node local() sandbox"]
+    cli["scripts/run-deep-verify.ts<br/>start → init → read"] --> local["Restricted Node local() adapter"]
     local --> clone["Temporary git clone in /tmp"]
     clone --> checks["Allowlisted verification commands"]
     checks --> verifySummary["Structured verification summary"]
   end
 ```
 
-## Core Flue workflow
+## Core Flue 2 runtime
 
 ```txt
-.flue/workflows/daily-maintenance.ts
+src/app.ts
+src/cloudflare.ts
+src/maintenance/daily.ts
+src/agents/report-analyst.ts
 ```
 
-The workflow:
+The application-owned Cloudflare Workflow:
 
 1. Validates the protected webhook secret.
 2. Loads durable memory from R2.
@@ -87,13 +90,15 @@ Historic snapshots:
 ```txt
 reports/history/YYYY-MM-DD/daily-maintenance.md
 reports/history/YYYY-MM-DD/daily-maintenance.json
+reports/history/YYYY-MM-DD/<runId>/daily-maintenance.md
+reports/history/YYYY-MM-DD/<runId>/daily-maintenance.json
 ```
 
 ## Runtime
 
-The daily workflow uses Flue's default virtual sandbox for local scratch files. GitHub API calls happen from trusted runtime code with secrets in env, not from prompts.
+The daily pipeline performs GitHub and R2 work in trusted application code; secrets and bindings never enter model prompts. Flue 2 is used only for the private hooks-based `ReportAnalyst` conversations that produce structured project audits and final synthesis. The hosted run is made durable by an application-owned Cloudflare Workflow.
 
-CLI-only workflows are used for heavyweight read-only checks. `deep-verify` clones changed repos into temporary local sandboxes, runs safe verification commands, and summarizes evidence without mutating GitHub.
+A CLI-only Flue agent is used for heavyweight read-only checks. `deep-verify` clones changed repos into a temporary Node `local()` sandbox, runs bounded verification commands, and summarizes evidence without mutating GitHub.
 
 ## Context bundles
 
@@ -119,7 +124,7 @@ audits/projects/<owner>__<repo>/history/<timestamp>.json
 
 ## Model routing
 
-With provider secrets, MaintainerBot can use Anthropic, OpenAI, or OpenRouter models. With `ANTHROPIC_API_KEY`, it can also use:
+With provider secrets, MaintainerBot can use Anthropic, OpenAI, or OpenRouter models. With `ANTHROPIC_API_KEY`, it defaults to:
 
 ```txt
 anthropic/claude-haiku-4-5

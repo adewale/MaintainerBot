@@ -203,3 +203,34 @@ audits/projects/<owner>__<repo>/latest.json
 MaintainerBotOut.md
 MaintainerBotOut.json
 ```
+
+## 15. Treat pre-1.0 Flue durable stores as reset-only operational state
+
+Flue beta storage schemas can change incompatibly. When upgrading Flue, validate Cloudflare Durable Object storage paths, not just the workflow result.
+
+For the beta.9 upgrade, the workflow completed but Wrangler tail exposed that `FlueRegistry` still had an old schema marker:
+
+```txt
+This database records an unrecognized schema version ("1"; this runtime supports version 4).
+```
+
+That meant run registry/history bookkeeping was unhealthy even though the daily report path worked. Always tail after deploy and watch Flue internal Durable Objects such as `FlueRegistry`, workflow DOs, and agent DOs.
+
+## 16. Reset Cloudflare Durable Object storage deliberately, then redeploy normal code
+
+Cloudflare migrations are not a general-purpose data reset tool. A migration that deletes and recreates the same Durable Object class in one history failed with:
+
+```txt
+class 'FlueRegistry' cannot be the target of more than one migration
+```
+
+For a reset-only Flue beta schema break, the safe operational pattern was:
+
+1. Build the normal Worker.
+2. Temporarily patch only the generated `FlueRegistry` class in `dist` to drop Flue registry tables/meta from inside the Durable Object.
+3. Deploy the temporary bundle.
+4. Trigger the registry once so the singleton DO clears its own SQLite state.
+5. Immediately redeploy the normal generated Worker.
+6. Verify `FlueRegistry` `/start` and `/end` calls return `204` with `outcome: ok` in Wrangler tail.
+
+Do not commit the temporary reset shim. Record the reset in operations notes because old run registry/history pointers are intentionally discarded.

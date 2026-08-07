@@ -7,37 +7,42 @@
     "node": ">=22.19.0"
   },
   "scripts": {
-    "build": "flue build --target node",
-    "build:cloudflare": "flue build --target cloudflare",
-    "dev": "flue dev --target node",
-    "dev:cloudflare": "flue dev --target cloudflare",
-    "deploy:cloudflare": "flue build --target cloudflare && wrangler deploy --config dist/maintainerbot/wrangler.json",
+    "build": "vite build --mode node",
+    "build:cloudflare": "vite build --mode cloudflare",
+    "dev": "vite dev --mode node",
+    "dev:cloudflare": "vite dev --mode cloudflare",
+    "preview": "vite preview --mode node",
+    "deploy:cloudflare": "vite build --mode cloudflare && wrangler deploy",
     "deploy:status": "wrangler deploy --config wrangler.status.jsonc",
     "check": "tsc --noEmit",
-    "daily": "flue run daily-maintenance --target node --input '{}'",
-    "deep:verify": "flue run deep-verify --target node",
-    "save:daily": "node scripts/run-daily.mjs",
+    "test": "vitest run && pnpm run test:rejections",
+    "daily": "tsx scripts/run-daily.ts",
+    "deep:verify": "tsx scripts/run-deep-verify.ts",
+    "save:daily": "tsx scripts/run-daily.ts",
     "reject": "node scripts/reject.mjs",
     "test:rejections": "node scripts/test-rejections.mjs",
     "test:mediabunny:gist": "node scripts/test-mediabunny-video-convert-local.mjs",
     "check:secrets": "node scripts/check-secrets.mjs"
   },
   "dependencies": {
-    "@flue/runtime": "1.0.0-beta.9",
-    "agents": "^0.14.5",
+    "@earendil-works/pi-ai": "^0.83.0",
+    "@flue/runtime": "2.0.0",
+    "@modelcontextprotocol/sdk": "1.30.0",
+    "agents": "^0.20.1",
+    "hono": "^4.12.33",
     "just-bash": "^3.0.1",
     "valibot": "^1.4.1"
   },
   "devDependencies": {
-    "@cloudflare/workers-types": "^4.20260620.1",
-    "@flue/cli": "1.0.0-beta.9",
+    "@cloudflare/vite-plugin": "^1.50.0",
+    "@cloudflare/workers-types": "^5.20260731.1",
+    "@flue/cli": "2.0.0",
+    "@flue/vite": "2.0.0",
     "@types/node": "^22.20.0",
+    "tsx": "^4.20.6",
     "typescript": "^6.0.3",
-    "wrangler": "^4.103.0"
-  },
-  "pnpm": {
-    "overrides": {
-      "@flue/runtime": "1.0.0-beta.9"
-    }
+    "vite": "^8.2.0",
+    "vitest": "^4.1.6",
+    "wrangler": "^4.118.0"
   }
 }

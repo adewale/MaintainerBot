@@ -27,10 +27,13 @@ Later phases may add read-only checkout/eval/coding-agent workflows, but those p
 
 ## Runtime
 
-Main workflow:
+Main runtime:
 
 ```txt
-.flue/workflows/daily-maintenance.ts
+src/app.ts
+src/cloudflare.ts
+src/maintenance/daily.ts
+src/agents/report-analyst.ts
 ```
 
 Public status Worker:
@@ -75,7 +78,8 @@ CF_AI_GATEWAY_TOKEN
 
 ```txt
 GitHub Actions or manual caller
-  → POST protected `/workflows/daily-maintenance?wait=result` webhook
+  → POST protected `/workflows/daily-maintenance?wait=result` Hono route
+  → application-owned Cloudflare Workflow
   → load R2 memory/indexes
   → fetch cheap repo/issue/PR facts
   → filter repos changed since 2025-11-17
@@ -124,17 +128,7 @@ See `docs/CONTEXT.md` for type signatures.
 
 ## LLM contract
 
-Per-project audit:
-
-```ts
-auditProjectWithLlm(session, projectContextBundle): Promise<ProjectAudit>
-```
-
-Run synthesis:
-
-```ts
-synthesizeRunWithLlm(session, runContextBundle): Promise<MaintenanceReport>
-```
+Per-project audit and run synthesis both dispatch the private Flue 2 `ReportAnalyst` agent. The agent uses hooks (`useModel`, `useTool`, `useDataWriter`) and returns schema-validated results through `AgentReply.data`; trusted code adds repository/run metadata before persistence.
 
 Rules:
 
@@ -154,6 +148,8 @@ reports/daily-maintenance-latest.md
 reports/daily-maintenance-latest.json
 reports/history/YYYY-MM-DD/daily-maintenance.md
 reports/history/YYYY-MM-DD/daily-maintenance.json
+reports/history/YYYY-MM-DD/<runId>/daily-maintenance.md
+reports/history/YYYY-MM-DD/<runId>/daily-maintenance.json
 ```
 
 ## Safety

@@ -105,18 +105,8 @@ type MaintainerBotRunContextBundle = {
 };
 ```
 
-## LLM call signatures
+## Flue 2 analysis contract
 
-```ts
-async function auditProjectWithLlm(
-  session: FlueSession,
-  bundle: ProjectContextBundle,
-): Promise<ProjectAudit>;
+Trusted application code dispatches the private `ReportAnalyst` agent with normalized evidence. The hooks-based agent must call `submit_analysis_result`; `useDataWriter('analysis-result', …)` records a schema-validated project-audit or run-synthesis value in `AgentReply.data`. Trusted code validates that value again and adds repository/run metadata before writing R2.
 
-async function synthesizeRunWithLlm(
-  session: FlueSession,
-  bundle: MaintainerBotRunContextBundle,
-): Promise<MaintenanceReport>;
-```
-
-LLM rule: use only the supplied bundle. If evidence is missing, recommend investigation rather than inventing facts.
+LLM rule: use only the supplied bundle. If evidence is missing, recommend investigation rather than inventing facts. Secrets and platform bindings are never included in agent initial data or messages.

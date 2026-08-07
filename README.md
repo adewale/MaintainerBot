@@ -1,6 +1,6 @@
 # MaintainerBot
 
-MaintainerBot is a read-only Flue maintenance bot for my public open-source projects. It runs daily, gathers deterministic GitHub/project facts, stores replayable context bundles in R2, and publishes an action-first handoff page.
+MaintainerBot is a read-only Flue 2 maintenance bot for my public open-source projects. It runs daily, gathers deterministic GitHub/project facts, stores replayable context bundles in R2, and publishes an action-first handoff page.
 
 If you are reading this from the “Learning Flue in 3 bots” thread, this is the third bot: a deployed, stateful Cloudflare/R2 example that is more realistic than a gist.
 
@@ -9,7 +9,8 @@ If you are reading this from the “Learning Flue in 3 bots” thread, this is t
 - **Live status page:** https://maintainerbot-status.adewale-883.workers.dev/
 - **Raw Markdown output:** https://pub-39149b57d8394ddea78c0ca9f90e087f.r2.dev/MaintainerBotOut.md
 - **JSON output:** https://maintainerbot-status.adewale-883.workers.dev/json
-- **Main workflow:** [`.flue/workflows/daily-maintenance.ts`](.flue/workflows/daily-maintenance.ts)
+- **Daily pipeline:** [`src/maintenance/daily.ts`](src/maintenance/daily.ts)
+- **Flue analysis agent:** [`src/agents/report-analyst.ts`](src/agents/report-analyst.ts)
 - **Living spec:** [`docs/LIVING_SPEC.md`](docs/LIVING_SPEC.md)
 - **Context model:** [`docs/CONTEXT.md`](docs/CONTEXT.md)
 - **Lessons learned:** [`docs/LESSONS_LEARNED.md`](docs/LESSONS_LEARNED.md)
@@ -52,13 +53,14 @@ That means no LLM provider key is configured in Cloudflare yet. The bot still bu
 
 ```txt
 Daily GitHub Actions schedule
-  → protected Cloudflare Worker webhook
+  → protected Hono webhook
+  → application-owned Cloudflare Workflow
   → read GitHub + R2 facts
   → compute cheap project fingerprints
   → reuse unchanged project context bundles
   → rebuild changed project context bundles
-  → optional LLM project audits
-  → optional LLM run synthesis
+  → optional Flue 2 ReportAnalyst project audits
+  → optional Flue 2 ReportAnalyst run synthesis
   → write Markdown/JSON/status/context/audit artifacts to R2
 ```
 
@@ -73,6 +75,8 @@ contexts/projects/<owner>__<repo>/latest.json
 audits/projects/<owner>__<repo>/latest.json
 reports/history/YYYY-MM-DD/daily-maintenance.md
 reports/history/YYYY-MM-DD/daily-maintenance.json
+reports/history/YYYY-MM-DD/<runId>/daily-maintenance.md
+reports/history/YYYY-MM-DD/<runId>/daily-maintenance.json
 ```
 
 ## Run locally
@@ -89,6 +93,12 @@ Primary local output:
 
 ```txt
 /tmp/MaintainerBotOut.md
+```
+
+The CLI-only verifier uses a local Flue 2 `start()`/`init()` wrapper so its structured result is printed as JSON:
+
+```bash
+pnpm run deep:verify -- --data '{"repo":"adewale/MaintainerBot"}'
 ```
 
 ## Configuration
@@ -143,6 +153,8 @@ curl -X POST 'https://maintainerbot.<your-subdomain>.workers.dev/workflows/daily
   -d '{"webhookSecret":"..."}'
 ```
 
+Long runs return `202` with a `statusUrl`; poll that URL with `Authorization: Bearer <webhook-secret>` until it returns `200` or a terminal error.
+
 ## Safety model
 
 - public source contains no secrets
@@ -164,9 +176,12 @@ pnpm run build:cloudflare
 ## Project map
 
 ```txt
-.flue/workflows/daily-maintenance.ts    main hosted Flue workflow
-.flue/workflows/deep-verify.ts          CLI-only future verifier scaffold
-workers/status.ts                    pretty status-page Worker
+src/app.ts                            protected Hono route
+src/cloudflare.ts                     application-owned daily Workflow
+src/maintenance/daily.ts              shared deterministic/R2 pipeline
+src/agents/report-analyst.ts           private Flue 2 hooks agent
+src/cli/deep-verify.ts                 CLI-only Flue 2 verifier
+workers/status.ts                      pretty status-page Worker
 docs/LIVING_SPEC.md                  concise intent
 docs/CONTEXT.md                      replayable context bundle model
 docs/LESSONS_LEARNED.md              design lessons

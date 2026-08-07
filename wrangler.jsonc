@@ -19,6 +19,13 @@
       "name": "SEND_EMAIL"
     }
   ],
+  "workflows": [
+    {
+      "binding": "MAINTAINERBOT_DAILY",
+      "name": "maintainerbot-daily",
+      "class_name": "MaintainerDailyWorkflow"
+    }
+  ],
   "migrations": [
     {
       "tag": "flue-class-DailyMaintenance",
@@ -33,6 +40,14 @@
           "to": "FlueDailyMaintenanceWorkflow"
         }
       ]
+    },
+    {
+      "tag": "flue-2-retire-beta-workflows",
+      "deleted_classes": ["FlueDailyMaintenanceWorkflow", "FlueDeepVerifyWorkflow", "FlueRegistry"]
+    },
+    {
+      "tag": "flue-2-report-analyst",
+      "new_sqlite_classes": ["FlueReportAnalystAgent"]
     }
   ]
 }

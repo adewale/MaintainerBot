@@ -14,6 +14,27 @@ jobs:
           MAINTAINERBOT_WEBHOOK_SECRET: ${{ secrets.MAINTAINERBOT_WEBHOOK_SECRET }}
         run: |
           test -n "$MAINTAINERBOT_WEBHOOK_SECRET"
-          curl --fail-with-body -X POST "https://maintainerbot.adewale-883.workers.dev/workflows/daily-maintenance?wait=result" \
+          base_url="https://maintainerbot.adewale-883.workers.dev/workflows/daily-maintenance"
+          admission=$(curl --fail-with-body -X POST "$base_url" \
             -H "Content-Type: application/json" \
-            -d "{\"webhookSecret\":\"$MAINTAINERBOT_WEBHOOK_SECRET\"}"
+            -H "Idempotency-Key: github-$GITHUB_RUN_ID" \
+            -d "{\"webhookSecret\":\"$MAINTAINERBOT_WEBHOOK_SECRET\"}")
+          run_id=$(jq -er '.runId' <<<"$admission")
+
+          for _ in $(seq 1 420); do
+            status=$(curl --silent --show-error --output /tmp/maintainerbot-status.json --write-out '%{http_code}' \
+              -H "Authorization: Bearer $MAINTAINERBOT_WEBHOOK_SECRET" \
+              "$base_url/$run_id")
+            if [ "$status" = 200 ]; then
+              cat /tmp/maintainerbot-status.json
+              exit 0
+            fi
+            if [ "$status" != 202 ]; then
+              cat /tmp/maintainerbot-status.json
+              exit 1
+            fi
+            sleep 5
+          done
+
+          echo "MaintainerBot workflow did not finish within 35 minutes." >&2
+          exit 1

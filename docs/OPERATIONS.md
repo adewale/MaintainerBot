@@ -10,7 +10,7 @@ The production path is already configured through GitHub Actions:
 .github/workflows/daily-maintenance.yml
 ```
 
-It invokes the protected Cloudflare webhook daily at 09:00 UTC.
+It invokes the protected Hono webhook daily at 09:00 UTC. The route starts the application-owned `MaintainerDailyWorkflow`, using the GitHub run ID as an idempotency key. GitHub Actions then polls the authenticated run-status route until completion, so a late Workflow failure fails the scheduled job instead of being hidden behind an admission `202`. Manual callers may still use `?wait=result` for a bounded synchronous wait and continue through the returned `statusUrl` when it times out.
 
 Required GitHub secret:
 
@@ -54,6 +54,8 @@ reports/daily-maintenance-latest.md
 reports/daily-maintenance-latest.json
 reports/history/YYYY-MM-DD/daily-maintenance.md
 reports/history/YYYY-MM-DD/daily-maintenance.json
+reports/history/YYYY-MM-DD/<runId>/daily-maintenance.md
+reports/history/YYYY-MM-DD/<runId>/daily-maintenance.json
 ```
 
 Public living status page:
@@ -139,12 +141,23 @@ MaintainerBot is read-only. Do not configure write-scoped GitHub tokens. The bot
 
 If a GitHub token is used, prefer the least-privileged read-only token available.
 
+## Flue 2 deployment migration
+
+Flue 2 replaces generated Flue workflows with hooks-based agents and application-owned orchestration. `wrangler.jsonc` keeps the deployed migration history and appends migrations that delete the beta-only `FlueRegistry`/workflow classes and create `FlueReportAnalystAgent`. R2 remains canonical and must be backed up before the first v2 deployment. Build and inspect with:
+
+```bash
+pnpm run build:cloudflare
+pnpm exec wrangler deploy --dry-run
+```
+
+Do not edit or reorder old migration tags. Deploy with `pnpm run deploy:cloudflare`; Vite and the Cloudflare plugin own the generated Worker config. The current Workflow deliberately disables automatic retries for its coarse side-effecting step; inspect a failed run before restarting it so model calls, email, and external writes are not replayed blindly.
+
 ## Deep verification
 
 Run the CLI-only read-only verifier locally or from GitHub Actions when a checkout/test pass is useful:
 
 ```bash
-pnpm run deep:verify -- --input '{"repo":"adewale/project"}'
+pnpm run deep:verify -- --data '{"repo":"adewale/project"}'
 ```
 
 The verifier refuses repositories not changed since November 17, 2025 and does not push anything.

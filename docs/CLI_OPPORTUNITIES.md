@@ -1,13 +1,13 @@
 # CLI-only Opportunities
 
-MaintainerBot's scheduled Worker should stay lightweight and read-only. CLI-only Flue workflows and local/GitHub Actions tools are better for anything that needs a checkout, dependency install, or command execution.
+MaintainerBot's scheduled Worker should stay lightweight and read-only. CLI-only Flue 2 agents and local/GitHub Actions tools are better for anything that needs a checkout, dependency install, or command execution.
 
 ## Added: `deep-verify`
 
-`deep-verify` is a CLI-only, read-only Flue workflow:
+`deep-verify` is a CLI-only, read-only Flue 2 agent:
 
 ```bash
-pnpm run deep:verify -- --input '{"repo":"adewale/project"}'
+pnpm run deep:verify -- --data '{"repo":"adewale/project"}'
 ```
 
 It:
@@ -16,9 +16,11 @@ It:
 - refuses repos not changed since `2025-11-17T00:00:00.000Z`
 - clones the repo into `/tmp`
 - asks the verifier agent to choose safe verification commands
-- runs at most five commands matching the local verification allowlist
+- exposes no generic host-shell/file tools; trusted code prepares the checkout and exposes bounded read/command tools
+- runs at most five commands through a fixed executable allowlist with shell-quoted arguments
 - summarizes evidence and recommended next human actions
 - never pushes, comments, labels, opens PRs, or edits GitHub state
+- must only be used with trusted repositories because their test/build scripts still execute on the local host
 
 ## Where CLI-only workflows/tools help
 
@@ -31,9 +33,9 @@ It:
 
 ## Lessons borrowed from Astro's `.flue`
 
-- **Use CLI-only workflows for heavyweight work.** No public route is needed for checkout/test workflows.
+- **Use CLI-only agents for heavyweight work.** The local wrapper boots Flue 2 with `start()`, then uses `init()`/`dispatch()`/`read()` so structured `AgentReply.data` is printed without a public route.
 - **Use command allowlists.** Run only commands matching the workflow's local verification policy.
-- **Stage workflows.** Prefer `plan → run checks → summarize` over one large prompt.
+- **Stage verification.** Prefer `plan → run checks → summarize` over one large prompt.
 - **Fetch noisy external data before prompting.** CI logs should be fetched and truncated before the LLM sees them.
 - **Use schemas for every LLM result.** Structured outputs make reports stable and machine-checkable.
 - **Retriage only when inputs changed.** This matches MaintainerBot's R2 audit-input hash ledger.

@@ -16,7 +16,7 @@ MaintainerBot is a read-only daily maintenance handoff for Adewale's public open
 ## Next milestones
 
 1. **Deep verification**
-   - Use the CLI-only `deep-verify` workflow for selected changed projects.
+   - Use the CLI-only Flue 2 `deep-verify` agent for selected changed projects.
    - Clone repos into temporary sandboxes.
    - Run safe tests/build/check commands.
    - Feed evidence back into the living status page.
