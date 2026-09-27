@@ -17,7 +17,7 @@ It:
 - clones the repo into `/tmp`
 - asks the verifier agent to choose safe verification commands
 - exposes no generic host-shell/file tools; trusted code prepares the checkout and exposes bounded read/command tools
-- runs at most five commands through a fixed executable allowlist with shell-quoted arguments
+- runs at most five commands through a fixed executable allowlist (`pnpm`, `npm`, `bun`, `node`, `python3`, `uv`, `make`) with shell-quoted arguments; `uv` is limited to `sync`, `run`, and `lock --check` without `--directory`/`--project`/`--cache-dir`/`--config-file`, and `make` accepts only targets, `VAR=value`, and `-k`/`-n`/`-s`/`-jN` (no `-C`, `-f`, `--eval`), so Python repositories' documented gates (`uv run pytest`, `make verify`) can run
 - summarizes evidence and recommended next human actions
 - never pushes, comments, labels, opens PRs, or edits GitHub state
 - must only be used with trusted repositories because their test/build scripts still execute on the local host

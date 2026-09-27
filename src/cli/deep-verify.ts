@@ -157,11 +157,12 @@ export function DeepVerify({ id }: AgentProps) {
     description:
       "Run one allowlisted verification executable in the prepared checkout. At most five calls are allowed.",
     input: v.object({
-      executable: v.picklist(["pnpm", "npm", "bun", "node", "python3"]),
+      executable: v.picklist(VERIFICATION_EXECUTABLES),
       args: v.array(v.string()),
     }),
     harness: true,
     async run({ harness, data: command }) {
+      validateVerificationCommand(command.executable, command.args);
       let accepted = false;
       const rendered = [command.executable, ...command.args]
         .map(shellQuote)
@@ -231,6 +232,76 @@ function verifierModel() {
   if (process.env.OPENROUTER_API_KEY)
     return "openrouter/anthropic/claude-3.5-haiku";
   return "anthropic/claude-haiku-4-5";
+}
+
+export const VERIFICATION_EXECUTABLES = [
+  "pnpm",
+  "npm",
+  "bun",
+  "node",
+  "python3",
+  "uv",
+  "make",
+] as const;
+
+// `uv` subcommands that verify a checkout. Everything else (pip, tool, python,
+// self, cache, publish, add/remove, ...) changes the host or the project.
+const UV_SUBCOMMANDS = new Set(["sync", "run", "lock"]);
+// uv options that point uv at another directory, cache, or config file.
+const UV_FORBIDDEN_OPTIONS = [
+  "--directory",
+  "--project",
+  "--cache-dir",
+  "--config-file",
+];
+const MAKE_FLAGS = new Set([
+  "-k",
+  "--keep-going",
+  "-n",
+  "--dry-run",
+  "-s",
+  "--silent",
+]);
+const MAKE_TARGET = /^[A-Za-z0-9][A-Za-z0-9_.-]*$/;
+const MAKE_VARIABLE = /^[A-Za-z_][A-Za-z0-9_]*=/;
+
+/**
+ * Argument policy for the executables that need one. `uv` and `make` let the
+ * verifier run the documented gates of Python repositories (`uv run pytest`,
+ * `make verify`) without letting it install global tools, change directory,
+ * or load a different Makefile.
+ */
+export function validateVerificationCommand(
+  executable: (typeof VERIFICATION_EXECUTABLES)[number],
+  args: string[],
+) {
+  if (executable === "uv") {
+    const [subcommand, ...rest] = args;
+    if (!subcommand || !UV_SUBCOMMANDS.has(subcommand))
+      throw new Error("uv is limited to `uv sync`, `uv run`, and `uv lock --check`");
+    if (subcommand === "lock" && !rest.includes("--check"))
+      throw new Error("uv lock is only allowed with --check");
+    const runSeparator = subcommand === "run" ? rest.indexOf("--") : -1;
+    const uvOptions = runSeparator >= 0 ? rest.slice(0, runSeparator) : rest;
+    for (const arg of uvOptions) {
+      if (
+        UV_FORBIDDEN_OPTIONS.some(
+          (option) => arg === option || arg.startsWith(`${option}=`),
+        )
+      )
+        throw new Error(`uv option ${arg} is not allowed`);
+    }
+    return;
+  }
+  if (executable === "make") {
+    for (const arg of args) {
+      if (MAKE_FLAGS.has(arg) || /^-j[0-9]+$/.test(arg)) continue;
+      if (arg.startsWith("-"))
+        throw new Error(`make option ${arg} is not allowed`);
+      if (MAKE_VARIABLE.test(arg) || MAKE_TARGET.test(arg)) continue;
+      throw new Error(`make argument ${arg} is not a target or VAR=value`);
+    }
+  }
 }
 
 export function safeRelativePath(path: string) {
