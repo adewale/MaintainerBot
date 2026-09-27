@@ -494,6 +494,8 @@ async function fetchOpenTodos(
               /^[-*]?\s*\[?\s*\]?\s*(TODO|todo|[/-])/.test(line) ||
               line.startsWith("- [ ]"),
           )
+          // Completed checklist items ("- [x] ...") are not open TODOs.
+          .filter((line) => !/^[-*]\s*\[[xX]\]/.test(line))
           .slice(0, 20);
       } catch {
         return [];
