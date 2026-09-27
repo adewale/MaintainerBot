@@ -607,7 +607,7 @@ async function readOrSeedR2(
   return defaultValue;
 }
 
-function rejectedFingerprints(rejectionsJson: string): Set<string> {
+export function rejectedFingerprints(rejectionsJson: string): Set<string> {
   try {
     return new Set<string>(
       (JSON.parse(rejectionsJson).rejected ?? []).map((item: any) =>
@@ -1439,7 +1439,7 @@ function linkRepoInText(value: string) {
   );
 }
 
-function buildDeterministicReport(
+export function buildDeterministicReport(
   repos: RepoSummary[],
   issues: WorkItem[],
   pullRequests: WorkItem[],

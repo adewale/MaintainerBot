@@ -169,7 +169,7 @@ Before pushing:
 ```bash
 pnpm run check:secrets
 pnpm run check
-pnpm run test:rejections
+pnpm test
 pnpm run build:cloudflare
 ```
 
