@@ -158,8 +158,11 @@ async function createOrGetWorkflow(
   idempotent: boolean,
 ) {
   if (idempotent) {
-    const existing = await binding.get(request.runId);
-    if ((await existing.status()).status !== "unknown") return existing;
+    // The Workflows binding rejects get() for an id it has never seen
+    // (`instance.not_found`); that is the normal case for a new key.
+    const existing = await binding.get(request.runId).catch(() => undefined);
+    if (existing && (await existing.status()).status !== "unknown")
+      return existing;
   }
   try {
     return await binding.create({ id: request.runId, params: request });
