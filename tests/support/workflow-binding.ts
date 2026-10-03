@@ -29,7 +29,10 @@ type Instance = {
 };
 
 export class FakeWorkflowBinding<Params = unknown> {
+  /** Instances this binding started. */
   readonly created: Array<{ id: string; params: Params }> = [];
+  /** Every create() call, including ones for an id that already exists. */
+  readonly createCalls: string[] = [];
   private readonly instances = new Map<string, Instance>();
 
   /** `statuses` are returned by successive `status()` calls; the last one repeats. */
@@ -45,6 +48,7 @@ export class FakeWorkflowBinding<Params = unknown> {
   }
 
   async create({ id, params }: { id: string; params: Params }) {
+    this.createCalls.push(id);
     const existing = this.instances.get(id);
     if (existing) return this.handle(existing);
     const instance = { id, params, statuses: this.statusesForNewRun() };

@@ -3,7 +3,10 @@
  * with the real Workflows engine on the lookups src/app.ts depends on.
  *
  * The real engine is Miniflare (workerd), which wrangler already ships; it is
- * resolved through wrangler so no extra dependency is needed.
+ * resolved through wrangler so no extra dependency is needed. A wrangler
+ * upgrade therefore also upgrades this engine: if this file starts failing
+ * after one, the runtime's behavior (or Miniflare's options) changed, and the
+ * fake and src/app.ts need to follow it.
  */
 import { createRequire } from "node:module";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";

@@ -39,23 +39,33 @@ function scan(files: Record<string, string | Buffer>) {
 
 describe("check-secrets: known-bad inputs fail the scan", () => {
   it.each([
-    ["Anthropic API key", `const k = "${"sk-" + "ant-api03-" + body(48)}";\n`],
-    ["OpenAI API key", `const k = "${"sk-" + body(48)}";\n`],
+    ["Anthropic API key", "Anthropic API key", `const k = "${"sk-" + "ant-api03-" + body(48)}";\n`],
+    ["OpenAI API key", "OpenAI API key", `const k = "${"sk-" + body(48)}";\n`],
     [
       "OpenAI project API key",
+      "OpenAI API key",
       `const k = "${"sk-" + "proj-" + body(40) + "_-" + body(40)}";\n`,
     ],
-    ["GitHub token", `const k = "${"ghp" + "_" + body(36)}";\n`],
+    ["GitHub token", "GitHub token", `const k = "${"ghp" + "_" + body(36)}";\n`],
     [
+      "Private key block",
       "Private key block",
       `${"-----BEGIN " + "PRIVATE KEY-----"}\nMIIEv\n-----END PRIVATE KEY-----\n`,
     ],
-    ["Env assignment", `${"DEPLOY_" + "TOKEN"}=${body(16)}\n`],
-    ["Bearer token", `curl -H "Authorization: ${"Bear" + "er"} ${body(48)}"\n`],
-  ])("%s", (_name, content) => {
+    [
+      "Env assignment",
+      "Env assignment with secret-ish name",
+      `${"DEPLOY_" + "TOKEN"}=${body(16)}\n`,
+    ],
+    [
+      "Long token next to a Bearer header",
+      "Cloudflare API token-like value",
+      `curl -H "Authorization: ${"Bear" + "er"} ${body(48)}"\n`,
+    ],
+  ])("%s", (_name, finding, content) => {
     const result = scan({ "src/config.ts": content });
     expect(result.status).toBe(1);
-    expect(result.output).toContain("src/config.ts:");
+    expect(result.output).toMatch(new RegExp(`src/config\\.ts:\\d+ ${finding} \\(`));
   });
 });
 

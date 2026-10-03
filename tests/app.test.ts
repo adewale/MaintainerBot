@@ -144,7 +144,7 @@ describe("POST /workflows/daily-maintenance", () => {
     );
 
     expect(response.status).toBe(202);
-    expect(binding.created).toEqual([]);
+    expect(binding.createCalls).toEqual([]);
     expect(await response.json()).toMatchObject({
       runId: "maintainerbot-github-123",
     });
@@ -199,6 +199,21 @@ describe("POST /workflows/daily-maintenance", () => {
 
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual(report);
+  });
+
+  it("fails the caller when the awaited Workflow errors", async () => {
+    const binding = new FakeWorkflowBinding<DailyRunRequest>(() => [
+      { status: "running" },
+      { status: "errored", error: { name: "Error", message: "boom" } },
+    ]);
+    const response = await request(
+      { webhookSecret: SECRET },
+      configured(binding),
+      "?wait=result",
+    );
+
+    expect(response.status).toBe(500);
+    expect(await response.json()).toMatchObject({ ok: false, error: "boom" });
   });
 });
 
