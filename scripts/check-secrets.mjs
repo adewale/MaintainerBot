@@ -8,7 +8,7 @@ const ignoredFiles = new Set(['pnpm-lock.yaml', 'results.sarif']);
 
 const patterns = [
   { name: 'Anthropic API key', re: /sk-ant-[A-Za-z0-9_-]{20,}/g },
-  { name: 'OpenAI API key', re: /sk-[A-Za-z0-9]{32,}/g },
+  { name: 'OpenAI API key', re: /sk-[A-Za-z0-9]{32,}|\bsk-(?:proj|svcacct|admin)-[A-Za-z0-9_-]{32,}/g },
   { name: 'GitHub token', re: /github_pat_[A-Za-z0-9_]{20,}|ghp_[A-Za-z0-9]{20,}|gho_[A-Za-z0-9]{20,}|ghu_[A-Za-z0-9]{20,}|ghs_[A-Za-z0-9]{20,}/g },
   { name: 'Cloudflare API token-like value', re: /[A-Za-z0-9_-]{40,}/g },
   { name: 'Private key block', re: /-----BEGIN (?:RSA |EC |OPENSSH |)?PRIVATE KEY-----/g },

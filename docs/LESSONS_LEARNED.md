@@ -234,3 +234,9 @@ For a reset-only Flue beta schema break, the safe operational pattern was:
 6. Verify `FlueRegistry` `/start` and `/end` calls return `204` with `outcome: ok` in Wrangler tail.
 
 Do not commit the temporary reset shim. Record the reset in operations notes because old run registry/history pointers are intentionally discarded.
+
+## 17. Check Cloudflare binding fakes against the real engine
+
+The Flue 2 upgrade made the daily admission call `MAINTAINERBOT_DAILY.get(runId)` before creating a Workflow, expecting an unknown id to come back with status `"unknown"`. The real Workflows binding rejects with `instance.not_found` instead, so every scheduled run (each with a fresh `Idempotency-Key`) got an HTTP 500 from 2026-08-08 until the fix. The unit tests used hand-written `vi.fn()` bindings that encoded the same wrong belief, and the daily GitHub Action stayed red without anyone noticing.
+
+`tests/support/workflow-binding.ts` is now the only Workflow binding double. `tests/workflow-binding.contract.test.ts` runs the same lookups against it and against Miniflare's real Workflows engine, so the fake cannot drift from the runtime unnoticed. Add a contract case there before relying on new binding behavior in `src/app.ts`.
