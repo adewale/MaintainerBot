@@ -117,6 +117,22 @@ describe("POST /workflows/daily-maintenance", () => {
     });
   });
 
+  it("does not start a run when the idempotency lookup fails for another reason", async () => {
+    const binding = new FakeWorkflowBinding<DailyRunRequest>();
+    binding.get = async () => {
+      throw new Error("binding unavailable");
+    };
+    const response = await request(
+      { webhookSecret: SECRET },
+      configured(binding),
+      "",
+      { "idempotency-key": "github-789" },
+    );
+
+    expect(response.status).toBe(500);
+    expect(binding.created).toEqual([]);
+  });
+
   it("reuses an existing Workflow for the same idempotency key", async () => {
     const binding = new FakeWorkflowBinding<DailyRunRequest>();
     binding.seed("maintainerbot-github-123", [{ status: "running" }]);
