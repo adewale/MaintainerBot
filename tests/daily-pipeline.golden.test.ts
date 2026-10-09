@@ -144,13 +144,13 @@ const issues = [
 ];
 
 const pullRequests = [
-  searchItem(
+  { ...searchItem(
     "adewale/alpha",
     12,
     "Add caching layer",
     "2026-06-20T00:00:00Z",
     "2026-08-15T00:00:00Z",
-  ),
+  ), html_url: 'https://github.com/adewale/alpha/pull/12', pull_request: { url: 'https://api.github.com/repos/adewale/alpha/pulls/12' } },
 ];
 
 const files = (...names: string[]) => names.map((name) => ({ name }));
@@ -319,6 +319,7 @@ describe("daily pipeline golden run (no LLM)", () => {
     expect(markdown).toContain(
       "1. [P0] Triage issue [adewale/bravo#3](https://github.com/adewale/bravo/issues/3)",
     );
+    expect(markdown).toContain('[adewale/alpha#12](https://github.com/adewale/alpha/pull/12)');
   });
 
   it("stores a run context bundle that matches the golden fixture", async () => {

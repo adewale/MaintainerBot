@@ -112,7 +112,7 @@
         "repo": "adewale/alpha",
         "number": 12,
         "title": "Add caching layer",
-        "url": "https://github.com/adewale/alpha/issues/12",
+        "url": "https://github.com/adewale/alpha/pull/12",
         "state": "open",
         "createdAt": "2026-06-20T00:00:00Z",
         "updatedAt": "2026-08-15T00:00:00Z",
@@ -162,7 +162,7 @@
     {
       "repo": "adewale/alpha",
       "stateFingerprint": "e3ac9f53c9be572f9e0cdd12d7f0e8ceb3077b61246336759f9908a2fc1a0a6c",
-      "inputHash": "94337230f01abd567dad1a87e5c2e3d0f73ca339ea559e83b251fb603eaccb63",
+      "inputHash": "745227c8fe1d918a8fd166d0c6b2cc89068fd17a204dcd6e57e5f674bbf73012",
       "r2Key": "contexts/projects/adewale__alpha/latest.json",
       "rebuiltThisRun": true,
       "latestAuditKey": "audits/projects/adewale__alpha/latest.json"
