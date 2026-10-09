@@ -15,12 +15,11 @@
     "deploy:cloudflare": "vite build --mode cloudflare && wrangler deploy",
     "deploy:status": "wrangler deploy --config wrangler.status.jsonc",
     "check": "tsc --noEmit",
-    "test": "vitest run && pnpm run test:rejections",
+    "test": "vitest run",
     "daily": "tsx scripts/run-daily.ts",
     "deep:verify": "tsx scripts/run-deep-verify.ts",
     "save:daily": "tsx scripts/run-daily.ts",
     "reject": "node scripts/reject.mjs",
-    "test:rejections": "node scripts/test-rejections.mjs",
     "test:mediabunny:gist": "node scripts/test-mediabunny-video-convert-local.mjs",
     "check:secrets": "node scripts/check-secrets.mjs"
   },

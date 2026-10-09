@@ -1,0 +1,188 @@
+{
+  "schemaVersion": 1,
+  "kind": "maintainerbot.run-context",
+  "runId": "golden-run",
+  "generatedAt": "2026-09-01T12:00:00.000Z",
+  "owner": "adewale",
+  "cutoff": "2025-11-17T00:00:00.000Z",
+  "promptVersion": "run-synthesis-v2",
+  "model": "none",
+  "deterministicSnapshot": {
+    "repos": [
+      {
+        "name": "alpha",
+        "fullName": "adewale/alpha",
+        "url": "https://github.com/adewale/alpha",
+        "description": "A healthy TypeScript project",
+        "openIssues": 1,
+        "stars": 5,
+        "pushedAt": "2026-08-30T10:00:00Z",
+        "language": "TypeScript",
+        "defaultBranch": "main",
+        "health": {
+          "hasReadme": true,
+          "hasLicense": true,
+          "hasCi": true,
+          "hasPackageJson": true,
+          "hasTests": true,
+          "hasLockfile": true,
+          "packageManager": "pnpm"
+        },
+        "openTodos": [
+          "- [ ] Document the cache"
+        ]
+      },
+      {
+        "name": "bravo",
+        "fullName": "adewale/bravo",
+        "url": "https://github.com/adewale/bravo",
+        "description": null,
+        "openIssues": 1,
+        "stars": 0,
+        "pushedAt": "2026-08-20T10:00:00Z",
+        "language": "JavaScript",
+        "defaultBranch": "main",
+        "health": {
+          "hasReadme": true,
+          "hasLicense": false,
+          "hasCi": false,
+          "hasPackageJson": true,
+          "hasTests": false,
+          "hasLockfile": false,
+          "packageManager": null
+        },
+        "openTodos": []
+      },
+      {
+        "name": "charlie",
+        "fullName": "adewale/charlie",
+        "url": "https://github.com/adewale/charlie",
+        "description": "A Python library",
+        "openIssues": 1,
+        "stars": 2,
+        "pushedAt": "2025-12-01T10:00:00Z",
+        "language": "Python",
+        "defaultBranch": "main",
+        "health": {
+          "hasReadme": false,
+          "hasLicense": true,
+          "hasCi": false,
+          "hasPackageJson": false,
+          "hasTests": false,
+          "hasLockfile": false,
+          "packageManager": null
+        },
+        "openTodos": []
+      }
+    ],
+    "openIssues": [
+      {
+        "repo": "adewale/bravo",
+        "number": 3,
+        "title": "Credential pattern missing from scanner",
+        "url": "https://github.com/adewale/bravo/issues/3",
+        "state": "open",
+        "createdAt": "2026-08-25T00:00:00Z",
+        "updatedAt": "2026-08-28T00:00:00Z",
+        "labels": [
+          "security"
+        ],
+        "comments": 1,
+        "author": "someone",
+        "ageDays": 7,
+        "stale": false
+      },
+      {
+        "repo": "adewale/charlie",
+        "number": 7,
+        "title": "Docs typo",
+        "url": "https://github.com/adewale/charlie/issues/7",
+        "state": "open",
+        "createdAt": "2026-05-01T00:00:00Z",
+        "updatedAt": "2026-05-02T00:00:00Z",
+        "labels": [],
+        "comments": 1,
+        "author": "someone",
+        "ageDays": 123,
+        "stale": true
+      }
+    ],
+    "openPullRequests": [
+      {
+        "repo": "adewale/alpha",
+        "number": 12,
+        "title": "Add caching layer",
+        "url": "https://github.com/adewale/alpha/pull/12",
+        "state": "open",
+        "createdAt": "2026-06-20T00:00:00Z",
+        "updatedAt": "2026-08-15T00:00:00Z",
+        "labels": [],
+        "comments": 1,
+        "author": "someone",
+        "ageDays": 73,
+        "stale": false
+      }
+    ],
+    "deterministicRecommendations": [
+      {
+        "fingerprint": "adewale/bravo:metadata-description:add-or-improve-project-description-documentation",
+        "repo": "adewale/bravo",
+        "title": "Add or improve project description/documentation",
+        "reason": "Repository metadata appears incomplete from the scan.",
+        "verification": "Confirm README accurately states purpose and update GitHub description or docs.",
+        "risk": "low"
+      },
+      {
+        "fingerprint": "adewale/charlie:missing-readme:add-readme-documentation",
+        "repo": "adewale/charlie",
+        "title": "Add README documentation",
+        "reason": "Repository does not expose a README at the root.",
+        "verification": "Add README with purpose, setup, run/test commands, and maintenance notes.",
+        "risk": "low"
+      },
+      {
+        "fingerprint": "adewale/bravo:missing-test-script:add-or-document-test-command",
+        "repo": "adewale/bravo",
+        "title": "Add or document test command",
+        "reason": "Package repository does not advertise a test/check script.",
+        "verification": "Add a test/check script or document why no automated test exists.",
+        "risk": "medium"
+      },
+      {
+        "fingerprint": "adewale/charlie:stale-repo-review:review-stale-repository-status",
+        "repo": "adewale/charlie",
+        "title": "Review stale repository status",
+        "reason": "Repository has not been pushed recently.",
+        "verification": "Confirm whether the repo should be archived, refreshed, or documented as complete.",
+        "risk": "low"
+      }
+    ]
+  },
+  "projectBundles": [
+    {
+      "repo": "adewale/alpha",
+      "stateFingerprint": "e3ac9f53c9be572f9e0cdd12d7f0e8ceb3077b61246336759f9908a2fc1a0a6c",
+      "inputHash": "745227c8fe1d918a8fd166d0c6b2cc89068fd17a204dcd6e57e5f674bbf73012",
+      "r2Key": "contexts/projects/adewale__alpha/latest.json",
+      "rebuiltThisRun": true,
+      "latestAuditKey": "audits/projects/adewale__alpha/latest.json"
+    },
+    {
+      "repo": "adewale/bravo",
+      "stateFingerprint": "f0ae256e5537c7c985044a553b1c29a83914c158acd56e15487970f40c5ee748",
+      "inputHash": "07c1ab2b9ac6909c8f491c9a059c1e69d0e89da0c2f198aa5f44b7f71b049d87",
+      "r2Key": "contexts/projects/adewale__bravo/latest.json",
+      "rebuiltThisRun": true,
+      "latestAuditKey": "audits/projects/adewale__bravo/latest.json"
+    },
+    {
+      "repo": "adewale/charlie",
+      "stateFingerprint": "ee6e120411cdc17924e2e4565a34d4251ea0ecf12db554800383866bd08fa00f",
+      "inputHash": "ccd23d883998b2aacf7a10ba1610c2377fed24a023b58c3f7db49b2ca5c33231",
+      "r2Key": "contexts/projects/adewale__charlie/latest.json",
+      "rebuiltThisRun": true,
+      "latestAuditKey": "audits/projects/adewale__charlie/latest.json"
+    }
+  ],
+  "latestProjectAudits": []
+}
