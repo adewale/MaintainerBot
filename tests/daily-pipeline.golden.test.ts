@@ -15,7 +15,7 @@
  * and review the diff.
  */
 import { readFileSync, writeFileSync } from "node:fs";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   buildDeterministicReport,
   renderMarkdown,
@@ -223,19 +223,22 @@ describe("daily pipeline golden run (no LLM)", () => {
     githubStub(String(input instanceof Request ? input.url : input)),
   );
 
-  beforeEach(() => {
+  let goldenRun: Awaited<ReturnType<typeof runGolden>>;
+  beforeAll(async () => {
     vi.useFakeTimers({ toFake: ["Date"] });
     vi.setSystemTime(new Date(GENERATED_AT));
     vi.stubGlobal("fetch", fetchStub);
+    goldenRun = await runGolden();
   });
-  afterEach(() => {
+  beforeEach(() => { fetchStub.mockClear(); });
+  afterAll(() => {
     vi.useRealTimers();
     vi.unstubAllGlobals();
     fetchStub.mockClear();
   });
 
   it("produces the expected findings and filters rejected fingerprints", async () => {
-    const { report } = await runGolden();
+    const { report } = goldenRun;
 
     expect(report.mode).toBe("context-only-no-model");
     expect(report.model).toBe("none");
@@ -279,7 +282,7 @@ describe("daily pipeline golden run (no LLM)", () => {
   });
 
   it("stores the report and context bundles in R2 and renders the handoff", async () => {
-    const { bucket, report } = await runGolden();
+    const { bucket, report } = goldenRun;
 
     expect(report.r2?.keys).toContain("reports/daily-maintenance-latest.json");
     for (const key of [
@@ -319,7 +322,7 @@ describe("daily pipeline golden run (no LLM)", () => {
   });
 
   it("stores a run context bundle that matches the golden fixture", async () => {
-    const { bucket } = await runGolden();
+    const { bucket } = goldenRun;
     const stored = JSON.parse(bucket.objects.get(`contexts/runs/${RUN_ID}.json`) ?? "null");
 
     if (process.env.UPDATE_GOLDEN) {

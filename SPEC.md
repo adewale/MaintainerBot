@@ -167,7 +167,7 @@ reports/history/YYYY-MM-DD/<runId>/daily-maintenance.json
 pnpm install
 pnpm run check:secrets
 pnpm run check
-pnpm test
+pnpm run test:rejections
 pnpm run build:cloudflare
 pnpm run deploy:cloudflare
 pnpm run deploy:status

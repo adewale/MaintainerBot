@@ -240,3 +240,7 @@ Do not commit the temporary reset shim. Record the reset in operations notes bec
 The Flue 2 upgrade made the daily admission call `MAINTAINERBOT_DAILY.get(runId)` before creating a Workflow, expecting an unknown id to come back with status `"unknown"`. The real Workflows binding rejects with `instance.not_found` instead, so every scheduled run (each with a fresh `Idempotency-Key`) got an HTTP 500 from 2026-08-08 until the fix. The unit tests used hand-written `vi.fn()` bindings that encoded the same wrong belief, and the daily GitHub Action stayed red without anyone noticing.
 
 `tests/support/workflow-binding.ts` is now the only Workflow binding double. `tests/workflow-binding.contract.test.ts` runs the same lookups against it and against Miniflare's real Workflows engine, so the fake cannot drift from the runtime unnoticed. Add a contract case there before relying on new binding behavior in `src/app.ts`.
+
+## 18. Replace imitation tests without expanding the maintenance workload
+
+Rejection filtering must exercise the ledger parser and deterministic report builder, not a separate array-filter example. The mocked no-model daily run also checks the persisted context and its replay. Share that one immutable run across assertions instead of refetching and rebuilding it for every assertion group; no scheduled run, model call or extra CI job is needed. Keep command-executable expansion separate from this regression repair: argument filters are not a sandbox and do not establish a cost bound.
