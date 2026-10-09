@@ -244,3 +244,14 @@ The Flue 2 upgrade made the daily admission call `MAINTAINERBOT_DAILY.get(runId)
 ## 18. Replace imitation tests without expanding the maintenance workload
 
 Rejection filtering must exercise the ledger parser and deterministic report builder, not a separate array-filter example. The mocked no-model daily run also checks the persisted context and its replay. Share that one immutable run across assertions instead of refetching and rebuilding it for every assertion group; no scheduled run, model call or extra CI job is needed. Keep command-executable expansion separate from this regression repair: argument filters are not a sandbox and do not establish a cost bound.
+
+## 19. Separate patched runtime dependencies from an unpatched advisory
+
+Resolve compatible patched releases through the actual Flue/Agents graph and
+build both deployment targets. Do not force a major leaf version into an older
+parent merely to make the audit green. The remaining sprintf-js precision
+advisory has no published fix. JustBash's command boundary returns exit code 1
+for the documented oversized f/e/g precision and remains usable afterward;
+that proves containment at this boundary, not a patched package or safety of
+every possible caller. Keep the residual advisory visible in maintenance
+tracking; do not introduce a waiver or a paid verification run.

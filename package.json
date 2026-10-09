@@ -26,11 +26,29 @@
   "dependencies": {
     "@earendil-works/pi-ai": "^0.83.0",
     "@flue/runtime": "2.0.0",
-    "@modelcontextprotocol/sdk": "1.30.0",
+    "@modelcontextprotocol/sdk": "1.31.0",
     "agents": "^0.20.1",
-    "hono": "^4.12.33",
+    "hono": "^4.13.13",
     "just-bash": "^3.0.1",
-    "valibot": "^1.4.1"
+    "valibot": "^1.4.2"
+  },
+  "pnpm": {
+    "overrides": {
+      "@modelcontextprotocol/sdk": "1.31.0",
+      "@modelcontextprotocol/client": "2.3.1",
+      "@hono/node-server": "2.1.4",
+      "hono": "4.13.13",
+      "valibot": "1.4.2",
+      "express>proxy-addr": "2.0.8",
+      "express>body-parser": "2.3.0",
+      "qs": "6.16.0",
+      "ajv>fast-uri": "3.1.8",
+      "express-rate-limit>ip-address": "10.7.1",
+      "protobufjs": "7.6.5",
+      "minimatch>brace-expansion": "5.0.12",
+      "smol-toml": "1.9.1",
+      "js-yaml": "5.4.1"
+    }
   },
   "devDependencies": {
     "@cloudflare/vite-plugin": "^1.63.1",
