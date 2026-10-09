@@ -67,15 +67,16 @@ async function call(op: "create" | "get", id: string) {
 
 beforeAll(async () => {
   const wrangler = createRequire(import.meta.url).resolve("wrangler");
-  const { Miniflare } = await import(
+  const { Miniflare, convertV4MiniflareOptions } = await import(
     createRequire(wrangler).resolve("miniflare")
   );
-  miniflare = new Miniflare({
+  // Keep the probe's V4 binding contract; use the supported V5 adapter.
+  miniflare = new Miniflare(convertV4MiniflareOptions({
     modules: true,
     script: WORKER,
     compatibilityDate: "2026-04-01",
     workflows: { WF: { name: "contract-probe", className: "Probe" } },
-  });
+  }));
 }, 30_000);
 
 afterAll(async () => {
