@@ -2,6 +2,18 @@
 
 This document captures durable lessons from designing and operating MaintainerBot.
 
+## Unpatched dependency findings need byte-level remediation, not audit cosmetics
+
+The `sprintf-js` advisory had no patched release, and even current JustBash
+still declared it. A version override, downgrade or audit ignore would not fix
+the installed code. Use pnpm's supported patch mechanism for the upstream
+precision-validation correction, and resolve contract tests through the actual
+consumer. Distinguish validation of the package from containment by JustBash:
+invalid formats remain errors, and a caller still needs error handling.
+Version-based audits cannot see the local patch; retain that finding honestly
+until an upstream release replaces it. Do not infer deployed protection from
+passing local checks or a merged lockfile.
+
 ## 1. LLMs synthesize; deterministic code discovers facts
 
 MaintainerBot should use deterministic loaders for source-of-truth facts:
