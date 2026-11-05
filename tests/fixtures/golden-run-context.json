@@ -5,7 +5,7 @@
   "generatedAt": "2026-09-01T12:00:00.000Z",
   "owner": "adewale",
   "cutoff": "2025-11-17T00:00:00.000Z",
-  "promptVersion": "run-synthesis-v2",
+  "promptVersion": "run-synthesis-v3",
   "model": "none",
   "deterministicSnapshot": {
     "repos": [

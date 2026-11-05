@@ -226,8 +226,8 @@ type R2BucketLike = {
   ): Promise<unknown>;
 };
 
-const PROJECT_AUDIT_PROMPT_VERSION = "project-audit-v2";
-const RUN_SYNTHESIS_PROMPT_VERSION = "run-synthesis-v2";
+const PROJECT_AUDIT_PROMPT_VERSION = "project-audit-v3";
+const RUN_SYNTHESIS_PROMPT_VERSION = "run-synthesis-v3";
 const DEFAULT_CUTOFF = "2025-11-17T00:00:00.000Z";
 
 const DEFAULT_REJECTIONS = JSON.stringify(
@@ -1061,7 +1061,7 @@ export function normalizeStoredProjectAudit(
     promptVersion:
       typeof raw.promptVersion === "string"
         ? raw.promptVersion
-        : PROJECT_AUDIT_PROMPT_VERSION,
+        : "unknown",
     model: typeof raw.model === "string" ? raw.model : "unknown",
     status: parsed.output.status,
     summary: parsed.output.summary,
@@ -1106,7 +1106,10 @@ async function auditChangedProjects(options: {
       project,
       options.generatedAt,
     );
-    if (existing?.inputHash === inputHash) {
+    if (
+      existing?.inputHash === inputHash &&
+      existing.promptVersion === PROJECT_AUDIT_PROMPT_VERSION
+    ) {
       carriedForward.push(project.repo);
       results.push(existing);
       continue;
